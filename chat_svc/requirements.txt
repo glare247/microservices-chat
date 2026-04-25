@@ -1,2 +1,5 @@
+# PyMS microservice framework
 py-ms[all]>=2.6.1
-Flask-SocketIO==3.2.1
+
+# Socket.IO for real time messaging
+Flask-SocketIO==5.3.6

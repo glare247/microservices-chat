@@ -1,17 +1,45 @@
-FROM python:3.7.5-slim
+FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y git gcc python3-dev
+ENV PYTHONUNBUFFERED=1 \
+    APP_HOME=/microservice/ \
+    CONFIGMAP_FILE=/microservice/config-docker.yml
 
-ENV PYTHONUNBUFFERED=1 APP_HOME=/microservice/ CONFIGMAP_FILE="$APP_HOME"config-docker.yml
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir $APP_HOME
+RUN mkdir -p $APP_HOME && \
+    addgroup --system appgroup && \
+    adduser --system --ingroup appgroup python && \
+    chown -R python $APP_HOME
+
 WORKDIR $APP_HOME
 
-ADD requirement*.txt $APP_HOME
-RUN pip install --upgrade pip && pip install -r requirements-docker.txt --pre
+COPY requirements*.txt $APP_HOME
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements-docker.txt
 
-ADD . $APP_HOME
+COPY . $APP_HOME
+
+USER python
 
 EXPOSE 8080
 
-ENTRYPOINT ["python", "manage.py"]
+HEALTHCHECK --interval=30s \
+            --timeout=10s \
+            --start-period=30s \
+            --retries=3 \
+  CMD python -c \
+  "import urllib.request; \
+   urllib.request.urlopen('http://localhost:8080/health')" \
+  || exit 1
+
+CMD ["gunicorn", \
+     "--worker-class", "gevent", \
+     "--workers", "1", \
+     "--log-level", "INFO", \
+     "--bind", "0.0.0.0:8080", \
+     "manage:app"]

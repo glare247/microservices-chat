@@ -1,2 +1,37 @@
-venv
-.idea
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+terraform/.terraform.lock.hcl
+
+# GCP credentials — NEVER commit
+*.json
+gcp-key.json
+service-account*.json
+application_default_credentials.json
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

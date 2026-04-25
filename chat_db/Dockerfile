@@ -1,20 +1,45 @@
-FROM python:3.6.4-alpine3.7
+FROM python:3.11-slim
 
-RUN apk add --update curl gcc g++ git libffi-dev openssl-dev python3-dev build-base linux-headers \
-    && rm -rf /var/cache/apk/*
-RUN ln -s /usr/include/locale.h /usr/include/xlocale.h
+ENV PYTHONUNBUFFERED=1 \
+    APP_HOME=/microservice/ \
+    CONFIGMAP_FILE=/microservice/config-docker.yml
 
-ENV PYTHONUNBUFFERED=1 APP_HOME=/microservice/ CONFIGMAP_FILE="$APP_HOME"config-docker.yml
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN mkdir $APP_HOME && adduser -S -D -H python && chown -R python $APP_HOME
+RUN mkdir -p $APP_HOME && \
+    addgroup --system appgroup && \
+    adduser --system --ingroup appgroup python && \
+    chown -R python $APP_HOME
+
 WORKDIR $APP_HOME
 
-ADD requirement*.txt $APP_HOME
-RUN pip install --upgrade pip && pip install -r requirements-docker.txt
+COPY requirements*.txt $APP_HOME
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements-docker.txt
 
-ADD . $APP_HOME
+COPY . $APP_HOME
 
-EXPOSE 8080
 USER python
 
-CMD ["gunicorn", "--worker-class", "gevent", "--workers", "1", "--log-level", "INFO", "--bind", "0.0.0.0:8080", "manage:app"]
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s \
+            --timeout=10s \
+            --start-period=30s \
+            --retries=3 \
+  CMD python -c \
+  "import urllib.request; \
+   urllib.request.urlopen('http://localhost:8080/health')" \
+  || exit 1
+
+CMD ["gunicorn", \
+     "--worker-class", "gevent", \
+     "--workers", "1", \
+     "--log-level", "INFO", \
+     "--bind", "0.0.0.0:8080", \
+     "manage:app"]

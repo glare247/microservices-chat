@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment files — never include secrets
+.env
+.env.*
+
+# Test files
+tests/
+test_*
+*_test.py
+
+# Documentation
+*.md
+docs/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Kubernetes manifests — not needed in image
+*.yaml
+*.yml

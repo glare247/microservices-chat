@@ -10,6 +10,6 @@ pyms:
     DEBUG: false
     TESTING: false
     APP_NAME: project
-    APPLICATION_ROOT : /
-    SECRET_KEY: "gjr39dkjn344_!67#"
-    service_host: http://chat-db:80/
+    APPLICATION_ROOT: /
+    SECRET_KEY: ${SECRET_KEY}
+    service_host: ${CHAT_DB_HOST}
