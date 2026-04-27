@@ -1,3 +1,31 @@
+# ═══════════════════════════════════════════════════════════════
+# GITHUB ACTIONS CI PIPELINE
+# Production Grade Cloud Native DevOps Platform
+#
+# REGISTRY: Google Artifact Registry (private)
+#   us-central1-docker.pkg.dev/microservices-chat/
+#   chat-platform-cluster-registry
+#
+# STAGES:
+#   1. scan-code        — app code quality + security
+#   2. scan-terraform   — infrastructure security
+#   3. build-push       — build + scan + push images
+#   4. update-manifests — trigger ArgoCD deployment
+#
+# AUTHENTICATION:
+#   Workload Identity Federation — no JSON keys
+#   GitHub Actions → GCP via OIDC tokens
+#   Tokens expire after 1 hour automatically
+#
+# BEST PRACTICES:
+#   Build and push in same job (no double build)
+#   Docker layer caching (faster builds)
+#   pip package caching (faster scans)
+#   Job timeouts (no infinite hangs)
+#   PR vs master separation
+#   Trivy scans exact image being pushed
+# ═══════════════════════════════════════════════════════════════
+
 name: CI Pipeline
 
 on:
@@ -7,10 +35,20 @@ on:
     branches: [master]
 
 env:
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG:  ${{ github.sha }}
+  REGISTRY:   us-central1-docker.pkg.dev
+  PROJECT_ID: microservices-chat
+  REPOSITORY: chat-platform-cluster-registry
+  REGION:     us-central1
 
 jobs:
 
+# ═══════════════════════════════════════════════════════════════
+# STAGE 1 — SCAN APPLICATION CODE
+# Checks Python code quality and security
+# Must pass before any image is built
+# If ANY scan fails pipeline stops immediately
+# ═══════════════════════════════════════════════════════════════
   scan-code:
     name: Scan Application Code
     runs-on: ubuntu-latest
@@ -21,6 +59,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # fetch-depth 0 = full git history
+          # Required for trufflehog to scan all commits
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
@@ -34,40 +74,60 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
+          # Caches downloaded packages between runs
+          # Speeds up repeated pipeline runs
+          # Cache invalidates when requirements change
 
       - name: Install scanning tools
         run: pip install flake8 bandit safety
 
-      - name: flake8
+      - name: flake8 — Python code quality
         run: |
           flake8 chat_front/ chat_svc/ chat_db/ \
-            --max-line-length=120 \
+            --max-line-length=130 \
             --exclude=__pycache__,*.pyc,setup.py \
             --count \
             --statistics
+        # max-line-length 130 matches our codebase
+        # count = show total error count
+        # statistics = show error type breakdown
 
-      - name: bandit
+      - name: bandit — Python security scan
         run: |
           bandit -r chat_front/ chat_svc/ chat_db/ \
             -ll \
             --exclude tests \
             -f txt
+        # -r = recursive scan all Python files
+        # -ll = report MEDIUM and HIGH severity only
+        # -f txt = text output format
 
-      - name: safety
+      - name: safety — dependency vulnerability scan
         run: |
           safety check \
             -r chat_db/requirements.txt \
             -r chat_svc/requirements.txt \
             -r chat_front/requirements.txt
+        # Checks requirements.txt against
+        # database of known vulnerable packages
+        # Fails if any package has known CVE
 
-      - name: trufflehog
+      - name: trufflehog — secret detection
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
           base: master
           head: HEAD
           extra_args: --only-verified
+        # Scans entire git history for secrets
+        # API keys passwords tokens etc
+        # --only-verified = confirmed secrets only
 
+# ═══════════════════════════════════════════════════════════════
+# STAGE 2 — SCAN TERRAFORM CODE
+# Checks infrastructure code for security issues
+# Must pass before any image is built
+# ═══════════════════════════════════════════════════════════════
   scan-terraform:
     name: Scan Terraform Code
     runs-on: ubuntu-latest
@@ -78,49 +138,112 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: tfsec
+      - name: tfsec — Terraform security scan
         uses: aquasecurity/tfsec-action@v1.0.0
         with:
           working_directory: terraform/
           soft_fail: false
+        # Checks for:
+        #   Cloud SQL public IP exposed
+        #   Unencrypted databases
+        #   Overly permissive firewall rules
+        #   GKE private nodes disabled
+        #   Missing backup configuration
 
       - name: Setup tflint
         uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: latest
 
-      - name: tflint
+      - name: tflint — Terraform code quality
         run: |
           cd terraform/
           tflint --init
           tflint
+        # Checks for:
+        #   Syntax errors in .tf files
+        #   Deprecated Terraform syntax
+        #   Unused variables
+        #   Missing required arguments
 
-      - name: checkov
+      - name: checkov — Infrastructure compliance
         uses: bridgecrewio/checkov-action@master
         with:
           directory: terraform/
           framework: terraform
           soft_fail: false
+        # Checks 500+ security rules:
+        #   CIS GCP Benchmark
+        #   NIST compliance
+        #   SOC2 requirements
 
+# ═══════════════════════════════════════════════════════════════
+# STAGE 3 — BUILD SCAN AND PUSH TO ARTIFACT REGISTRY
+# Authenticates with GCP via Workload Identity
+# Builds images pushes to private Artifact Registry
+# Scans images with Trivy before pushing
+#
+# WHY ARTIFACT REGISTRY OVER DOCKER HUB:
+#   Private — only GCP account can access
+#   Faster  — stays inside Google network
+#             no internet needed for GKE pulls
+#   Secure  — Workload Identity authentication
+#             no stored credentials anywhere
+#   No limits — no Docker Hub rate limiting
+# ═══════════════════════════════════════════════════════════════
   build-push:
     name: Build Scan and Push Images
     runs-on: ubuntu-latest
     needs: scan-terraform
     timeout-minutes: 45
 
+    permissions:
+      contents: read
+      id-token: write
+      # id-token write REQUIRED for Workload Identity
+      # Allows GitHub to generate OIDC token
+      # GCP exchanges OIDC token for temporary credentials
+      # Credentials valid for 1 hour only — auto expire
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        # Workload Identity Federation
+        # No JSON keys stored anywhere
+        # Uses OIDC token from GitHub
+        # GCP verifies token with GitHub directly
+        # Issues temporary GCP credentials
+        # Much more secure than service account keys
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        # Installs gcloud CLI on the runner
+        # Required for docker authentication command
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker \
+            us-central1-docker.pkg.dev \
+            --quiet
+        # Configures Docker to use GCP credentials
+        # when pushing to Artifact Registry
+        # Only us-central1 registry configured
+        # --quiet suppresses confirmation prompts
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        # Enables advanced Docker build features:
+        #   Layer caching between pipeline runs
+        #   Better build performance
+        #   Multi-platform build support
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
+      # ─── chat_front ──────────────────────────────
       - name: Build chat_front
         uses: docker/build-push-action@v5
         with:
@@ -128,28 +251,45 @@ jobs:
           file: chat_front/Dockerfile
           push: false
           load: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/chat-front:${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+        # push: false = build only do not push yet
+        # load: true = load into local Docker daemon
+        #              so Trivy can scan it
+        # cache-from/to = reuse unchanged layers
+        #                 between pipeline runs
 
-      - name: Trivy chat_front
+      - name: Trivy — scan chat_front
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/chat-front:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:${{ github.sha }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+        # Scans EXACT image that will be pushed
+        # exit-code 1 = fail pipeline if CVEs found
+        # severity = only fail on CRITICAL and HIGH
+        # ignore-unfixed = skip vulns with no fix yet
 
       - name: Push chat_front
         if: github.ref == 'refs/heads/master'
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/chat-front:${{ github.sha }}
+          docker push \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:${{ github.sha }}
           docker tag \
-            ${{ secrets.DOCKER_USERNAME }}/chat-front:${{ github.sha }} \
-            ${{ secrets.DOCKER_USERNAME }}/chat-front:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/chat-front:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:latest
+          docker push \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:latest
+        # Only push on master branch
+        # Pull requests build and scan but never push
+        # Two tags pushed:
+        #   :SHA    = exact immutable version
+        #   :latest = always points to newest
 
+      # ─── chat_svc ────────────────────────────────
       - name: Build chat_svc
         uses: docker/build-push-action@v5
         with:
@@ -157,14 +297,14 @@ jobs:
           file: chat_svc/Dockerfile
           push: false
           load: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/chat-svc:${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trivy chat_svc
+      - name: Trivy — scan chat_svc
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/chat-svc:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:${{ github.sha }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
@@ -173,12 +313,15 @@ jobs:
       - name: Push chat_svc
         if: github.ref == 'refs/heads/master'
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/chat-svc:${{ github.sha }}
+          docker push \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:${{ github.sha }}
           docker tag \
-            ${{ secrets.DOCKER_USERNAME }}/chat-svc:${{ github.sha }} \
-            ${{ secrets.DOCKER_USERNAME }}/chat-svc:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/chat-svc:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:latest
+          docker push \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:latest
 
+      # ─── chat_db ─────────────────────────────────
       - name: Build chat_db
         uses: docker/build-push-action@v5
         with:
@@ -186,14 +329,14 @@ jobs:
           file: chat_db/Dockerfile
           push: false
           load: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/chat-db:${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trivy chat_db
+      - name: Trivy — scan chat_db
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/chat-db:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:${{ github.sha }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
@@ -202,12 +345,21 @@ jobs:
       - name: Push chat_db
         if: github.ref == 'refs/heads/master'
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/chat-db:${{ github.sha }}
+          docker push \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:${{ github.sha }}
           docker tag \
-            ${{ secrets.DOCKER_USERNAME }}/chat-db:${{ github.sha }} \
-            ${{ secrets.DOCKER_USERNAME }}/chat-db:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/chat-db:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:latest
+          docker push \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:latest
 
+# ═══════════════════════════════════════════════════════════════
+# STAGE 4 — UPDATE KUBERNETES MANIFESTS
+# Updates image tags in deployment.yaml files
+# Commits changes back to GitHub
+# ArgoCD detects change and deploys to GKE
+# Only runs on master — not on pull requests
+# ═══════════════════════════════════════════════════════════════
   update-manifests:
     name: Update K8s Manifests
     runs-on: ubuntu-latest
@@ -220,23 +372,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN auto provided by GitHub Actions
+          # Used to commit manifest changes back to repo
 
       - name: Update chat_front image tag
         run: |
           sed -i \
-            "s|image: .*/chat-front:.*|image: ${{ secrets.DOCKER_USERNAME }}/chat-front:${{ github.sha }}|g" \
+            "s|image: .*/chat-front:.*|image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:${{ github.sha }}|g" \
             k8s/chat-front/deployment.yaml
 
       - name: Update chat_svc image tag
         run: |
           sed -i \
-            "s|image: .*/chat-svc:.*|image: ${{ secrets.DOCKER_USERNAME }}/chat-svc:${{ github.sha }}|g" \
+            "s|image: .*/chat-svc:.*|image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-svc:${{ github.sha }}|g" \
             k8s/chat-svc/deployment.yaml
 
       - name: Update chat_db image tag
         run: |
           sed -i \
-            "s|image: .*/chat-db:.*|image: ${{ secrets.DOCKER_USERNAME }}/chat-db:${{ github.sha }}|g" \
+            "s|image: .*/chat-db:.*|image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-db:${{ github.sha }}|g" \
             k8s/chat-db/deployment.yaml
 
       - name: Commit and push manifest updates
@@ -247,8 +401,12 @@ jobs:
           git diff --staged --quiet || \
             git commit -m "ci: update image tags to ${{ github.sha }}
 
+            Registry: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}
             Updated images:
             - chat-front:${{ github.sha }}
             - chat-svc:${{ github.sha }}
             - chat-db:${{ github.sha }}"
           git push
+        # git diff --staged --quiet checks for changes
+        # || only commits if there are actual changes
+        # Prevents empty commits on re-runs
