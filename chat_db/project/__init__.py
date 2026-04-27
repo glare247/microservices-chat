@@ -20,5 +20,5 @@ def create_app():
     :return:
     """
     ms = MyMicroservice(path=__file__)
-    
+
     return ms.create_app()
