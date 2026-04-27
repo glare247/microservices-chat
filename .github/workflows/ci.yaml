@@ -43,7 +43,10 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install scanning tools
-        run: pip install flake8 bandit safety
+        run: pip install flake8 bandit pip-audit
+        # pip-audit replaces safety
+        # No login required
+        # Google maintained tool
 
       - name: flake8 — Python code quality
         run: |
@@ -60,17 +63,17 @@ jobs:
             --exclude tests \
             -f txt
 
-      - name: safety — dependency vulnerability scan
+      - name: pip-audit — dependency vulnerability scan
         run: |
-          safety scan \
-            --file chat_db/requirements.txt \
-            --file chat_svc/requirements.txt \
-            --file chat_front/requirements.txt \
-            --continue-on-error
-        # safety scan = new command replacing deprecated check
-        # --continue-on-error = do not fail on unpinned packages
-        # py-ms is unpinned (>=2.6.1) — this is acceptable
-        # for a learning project using an existing repo
+          pip-audit \
+            -r chat_db/requirements.txt \
+            -r chat_svc/requirements.txt \
+            -r chat_front/requirements.txt \
+            --skip-editable
+        # pip-audit = Google maintained free tool
+        # No login required
+        # Checks PyPI Advisory Database for CVEs
+        # --skip-editable skips editable installs
 
       - name: trufflehog — secret detection
         uses: trufflesecurity/trufflehog@main
@@ -79,12 +82,10 @@ jobs:
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
           extra_args: --only-verified
-        # Fixed: use default_branch instead of hardcoded master
-        # Handles case where BASE and HEAD are same commit
         continue-on-error: true
-        # continue-on-error = do not fail pipeline if
-        # there is only one commit (nothing to compare)
-        # Trufflehog will still run on subsequent pushes
+        # continue-on-error handles case where
+        # BASE and HEAD are the same commit
+        # Trufflehog runs correctly on subsequent pushes
 
 # ═══════════════════════════════════════════
 # STAGE 2 — SCAN TERRAFORM CODE
