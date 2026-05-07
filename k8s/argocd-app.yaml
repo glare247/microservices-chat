@@ -1,0 +1,50 @@
+# ═══════════════════════════════════════════════════════════════
+# ARGOCD APPLICATION
+# Tells ArgoCD WHERE the K8s manifests are
+# and WHERE to deploy them
+#
+# GITOPS FLOW:
+#   Developer pushes code
+#   GitHub Actions builds + pushes image
+#   GitHub Actions updates image tag in k8s/
+#   ArgoCD detects manifest change
+#   ArgoCD syncs to GKE automatically
+#   Pods updated with zero downtime
+# ═══════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chat-platform
+  namespace: argocd
+  labels:
+    app: chat-platform
+    managed-by: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/glare247/microservices-chat
+    targetRevision: master
+    path: k8s
+    # Watches k8s/ folder in GitHub repo
+    # on master branch
+    # Every file in k8s/ is applied to GKE
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: chat-app
+    # Deploy to chat-app namespace
+    # in the same cluster ArgoCD runs in
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      # prune    = delete resources removed from Git
+      # selfHeal = revert any manual kubectl changes
+      # Cluster ALWAYS matches what is in Git
+
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true

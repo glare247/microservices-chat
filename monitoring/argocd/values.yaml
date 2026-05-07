@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# ARGOCD HELM VALUES
+# Cloud hosted via GKE Ingress
+# Accessible at https://argocd.chatms.store
+# Uses Google Managed SSL certificate
+# ClusterIP service — not publicly exposed directly
+# All traffic goes through Load Balancer → NGINX Ingress
+# ═══════════════════════════════════════════════════════════════
+server:
+  service:
+    type: ClusterIP
+    # Not exposed directly to internet
+    # Traffic comes through Ingress only
+
+  ingress:
+    enabled: true
+    ingressClassName: gce
+    hostname: argocd.chatms.store
+    annotations:
+      kubernetes.io/ingress.class: "gce"
+      kubernetes.io/ingress.global-static-ip-name: chat-platform-cluster-lb-ip
+      networking.gke.io/managed-certificates: chat-certificate
+      kubernetes.io/ingress.allow-http: "false"
+    tls:
+      - hosts:
+          - argocd.chatms.store
+
+configs:
+  params:
+    server.insecure: true
+    # ArgoCD runs HTTP internally
+    # SSL terminated at Load Balancer
+    # Best practice for GKE Ingress setup

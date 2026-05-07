@@ -3,3 +3,4 @@ py-ms[all]>=2.6.1
 
 # Socket.IO for real time messaging
 Flask-SocketIO==5.3.6
+tornado>=6.5.5

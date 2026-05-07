@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-front
+  namespace: chat-app
+  labels:
+    app: chat-front
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: chat-front
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: chat-front
+    spec:
+      containers:
+        - name: chat-front
+          image: us-central1-docker.pkg.dev/microservices-chat/chat-platform-cluster-registry/chat-front:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: chat-db-secret
+                  key: SECRET_KEY
+            - name: CHAT_SVC_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: chat-db-secret
+                  key: CHAT_SVC_HOST
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3

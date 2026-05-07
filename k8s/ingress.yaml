@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chat-ingress
+  namespace: chat-app
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: chat-platform-cluster-lb-ip
+    networking.gke.io/managed-certificates: chat-certificate
+    kubernetes.io/ingress.allow-http: "false"
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+    - host: chatms.store
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-front
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-svc
+                port:
+                  number: 80
+    - host: www.chatms.store
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-front
+                port:
+                  number: 80
