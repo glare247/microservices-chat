@@ -1,3 +1,2 @@
 # PyMS microservice framework
 py-ms[all]>=2.6.1
-tornado>=6.5.5

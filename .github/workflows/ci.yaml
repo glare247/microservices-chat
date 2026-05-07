@@ -44,9 +44,6 @@ jobs:
 
       - name: Install scanning tools
         run: pip install flake8 bandit pip-audit
-        # pip-audit replaces safety
-        # No login required
-        # Google maintained tool
 
       - name: flake8 — Python code quality
         run: |
@@ -69,11 +66,22 @@ jobs:
             -r chat_db/requirements.txt \
             -r chat_svc/requirements.txt \
             -r chat_front/requirements.txt \
-            --skip-editable
-        # pip-audit = Google maintained free tool
-        # No login required
-        # Checks PyPI Advisory Database for CVEs
-        # --skip-editable skips editable installs
+            --skip-editable \
+            --ignore-vuln PYSEC-2023-75 \
+            --ignore-vuln GHSA-qppv-j76h-2rpx \
+            --ignore-vuln GHSA-753j-mpmx-qq6g \
+            --ignore-vuln GHSA-w235-7p84-xx57 \
+            --ignore-vuln CVE-2025-47287 \
+            --ignore-vuln CVE-2024-52804 \
+            --ignore-vuln GHSA-78cv-mqj4-43f7 \
+            --ignore-vuln CVE-2026-31958 \
+            --ignore-vuln CVE-2026-35536
+        # py-ms has hard dependency on tornado<6
+        # Cannot upgrade tornado without breaking py-ms
+        # These CVEs are in tornado pulled by py-ms
+        # Documented as known accepted risk
+        # py-ms used only for internal service comms
+        # not directly exposed to public internet
 
       - name: trufflehog — secret detection
         uses: trufflesecurity/trufflehog@main
@@ -83,9 +91,6 @@ jobs:
           head: HEAD
           extra_args: --only-verified
         continue-on-error: true
-        # continue-on-error handles case where
-        # BASE and HEAD are the same commit
-        # Trufflehog runs correctly on subsequent pushes
 
 # ═══════════════════════════════════════════
 # STAGE 2 — SCAN TERRAFORM CODE
