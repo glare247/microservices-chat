@@ -55,11 +55,18 @@ resource "google_compute_network" "vpc" {
 #   Cloud Router        — routes outbound traffic
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_subnetwork" "public_subnet" {
-  name          = "${var.cluster_name}-public-subnet"
-  ip_cidr_range = var.public_subnet_cidr
-  region        = var.region
-  network       = google_compute_network.vpc.id
-  description   = "Public subnet for Load Balancer and NAT Gateway"
+  name                     = "${var.cluster_name}-public-subnet"
+  ip_cidr_range            = var.public_subnet_cidr
+  region                   = var.region
+  network                  = google_compute_network.vpc.id
+  description              = "Public subnet for Load Balancer and NAT Gateway"
+  private_ip_google_access = true
+
+  log_config {
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -102,6 +109,12 @@ resource "google_compute_subnetwork" "private_subnet" {
   secondary_ip_range {
     range_name    = "services"
     ip_cidr_range = var.services_cidr
+  }
+
+  log_config {
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
   }
 }
 
@@ -151,6 +164,7 @@ resource "google_compute_firewall" "allow_internal" {
 # All other ports blocked by default
 # Minimum attack surface — security best practice
 # ═══════════════════════════════════════════════════════════════
+#checkov:skip=CKV_GCP_106: Port 80 required for GCP load balancer health checks and HTTP→HTTPS redirect
 resource "google_compute_firewall" "allow_http_https" {
   name    = "${var.cluster_name}-allow-http-https"
   network = google_compute_network.vpc.name
@@ -227,6 +241,9 @@ resource "google_compute_router_nat" "nat" {
 #   If zone-a fails zone-b keeps serving traffic
 #   No single point of failure
 # ═══════════════════════════════════════════════════════════════
+#checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev — restrict to VPN IP in production
+#checkov:skip=CKV_GCP_65: Google Groups for RBAC requires Google Workspace — not available in dev project
+#checkov:skip=CKV_GCP_66: Binary Authorization is an enterprise feature — out of scope for dev environment
 resource "google_container_cluster" "gke" {
   name     = var.cluster_name
   location = var.region
@@ -264,6 +281,12 @@ resource "google_container_cluster" "gke" {
     }
   }
 
+  master_auth {
+    client_certificate_config {
+      issue_client_certificate = false
+    }
+  }
+
   deletion_protection = false
 }
 
@@ -293,6 +316,10 @@ resource "google_container_node_pool" "nodes" {
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"
     ]
+
+    workload_metadata_config {
+      mode = "GKE_METADATA"
+    }
 
     labels = {
       env        = "dev"
@@ -385,6 +412,26 @@ resource "google_sql_database_instance" "postgres" {
     database_flags {
       name  = "max_connections"
       value = "100"
+    }
+
+    database_flags {
+      name  = "log_checkpoints"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_connections"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_disconnections"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_lock_waits"
+      value = "on"
     }
 
     user_labels = {
