@@ -293,6 +293,18 @@ resource "google_container_cluster" "gke" {
     provider = "CALICO"
   }
 
+  release_channel {
+    channel = "REGULAR"
+  }
+
+  enable_intranode_visibility = true
+
+  resource_labels = {
+    env        = "dev"
+    project    = var.cluster_name
+    managed-by = "terraform"
+  }
+
   deletion_protection = false
 }
 
@@ -331,6 +343,11 @@ resource "google_container_node_pool" "nodes" {
       env        = "dev"
       project    = var.cluster_name
       managed-by = "terraform"
+    }
+
+    shielded_instance_config {
+      enable_secure_boot          = true
+      enable_integrity_monitoring = true
     }
 
     tags = ["gke-node", var.cluster_name]
@@ -393,6 +410,8 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 #   Zero downtime maintenance
 # ═══════════════════════════════════════════════════════════════
 resource "google_sql_database_instance" "postgres" {
+  #checkov:skip=CKV_GCP_79: POSTGRES_15 is our chosen stable version; upgrading to 16 requires testing
+  #checkov:skip=CKV_GCP_6: ssl_mode=ENCRYPTED_ONLY is stricter than require_ssl — checkov does not recognise the newer attribute
   name             = var.db_instance_name
   database_version = "POSTGRES_15"
   region           = var.region
@@ -437,6 +456,31 @@ resource "google_sql_database_instance" "postgres" {
 
     database_flags {
       name  = "log_lock_waits"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_min_messages"
+      value = "ERROR"
+    }
+
+    database_flags {
+      name  = "log_statement"
+      value = "all"
+    }
+
+    database_flags {
+      name  = "log_duration"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_hostname"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "cloudsql.enable_pgaudit"
       value = "on"
     }
 
@@ -502,6 +546,10 @@ resource "google_dns_managed_zone" "chat_zone" {
   description = "DNS zone for ${var.domain_name}"
   project     = var.project_id
   visibility  = "public"
+
+  dnssec_config {
+    state = "on"
+  }
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -558,6 +606,7 @@ resource "google_dns_record_set" "chat_www_record" {
 #   chat-front:SHA
 # ═══════════════════════════════════════════════════════════════
 resource "google_artifact_registry_repository" "chat_registry" {
+  #checkov:skip=CKV_GCP_84: CSEK requires customer-managed KMS keys — out of scope for dev; Google-managed encryption is sufficient
   project       = var.project_id
   location      = var.region
   repository_id = "${var.cluster_name}-registry"
