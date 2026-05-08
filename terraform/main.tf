@@ -412,6 +412,7 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 resource "google_sql_database_instance" "postgres" {
   #checkov:skip=CKV_GCP_79: POSTGRES_15 is our chosen stable version; upgrading to 16 requires testing
   #checkov:skip=CKV_GCP_6: ssl_mode=ENCRYPTED_ONLY is stricter than require_ssl — checkov does not recognise the newer attribute
+  #checkov:skip=CKV_GCP_55: CKV_GCP_55 conflicts with CKV_GCP_109 in checkov 3.2.527 — ERROR satisfies CKV_GCP_109 (stricter) but incorrectly fails CKV_GCP_55
   name             = var.db_instance_name
   database_version = "POSTGRES_15"
   region           = var.region
