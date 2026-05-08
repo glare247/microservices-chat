@@ -1,3 +1,4 @@
+
 # ═══════════════════════════════════════════════════════════════
 # TERRAFORM CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
@@ -7,16 +8,13 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 6.0"
+      version = "~> 5.0"
     }
   }
 }
 
 # ═══════════════════════════════════════════════════════════════
 # PROVIDER
-# Connects Terraform to GCP
-# Uses gcloud Application Default Credentials
-# No hardcoded keys anywhere
 # ═══════════════════════════════════════════════════════════════
 provider "google" {
   project = var.project_id
@@ -25,9 +23,6 @@ provider "google" {
 
 # ═══════════════════════════════════════════════════════════════
 # DATA SOURCE — GCP DEFAULT SERVICE ACCOUNT
-# Gets the default compute service account email
-# Used by GKE nodes to pull images from Artifact Registry
-# via private_ip_google_access — no NAT needed
 # ═══════════════════════════════════════════════════════════════
 data "google_compute_default_service_account" "default" {
   project = var.project_id
@@ -35,9 +30,6 @@ data "google_compute_default_service_account" "default" {
 
 # ═══════════════════════════════════════════════════════════════
 # VPC NETWORK
-# Main private network container for all resources
-# auto_create_subnetworks = false gives full control
-# We create our own public and private subnets
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_network" "vpc" {
   name                    = "${var.cluster_name}-vpc"
@@ -46,13 +38,6 @@ resource "google_compute_network" "vpc" {
 
 # ═══════════════════════════════════════════════════════════════
 # PUBLIC SUBNET — 10.0.1.0/24
-# Internet facing subnet
-# Resources here CAN have public IP addresses
-#
-# CONTAINS:
-#   Cloud Load Balancer — receives user traffic from chatms.store
-#   NAT Gateway         — outbound internet for pods
-#   Cloud Router        — routes outbound traffic
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_subnetwork" "public_subnet" {
   name                     = "${var.cluster_name}-public-subnet"
@@ -71,27 +56,9 @@ resource "google_compute_subnetwork" "public_subnet" {
 
 # ═══════════════════════════════════════════════════════════════
 # PRIVATE SUBNET — 10.0.2.0/24
-# Secure internal subnet — NO direct internet access
-# Resources here have ONLY private IP addresses
-#
-# CONTAINS:
-#   GKE nodes    — runs all microservice pods
-#   NGINX Ingress — routes traffic to pods
-#   Cloud SQL    — PostgreSQL database
-#
 # private_ip_google_access = true
-#   Allows private nodes to reach Google APIs directly:
-#     Artifact Registry — image pulls (no NAT needed)
-#     Cloud SQL API
-#     GCP Logging API
-#     GCP Monitoring API
-#   Traffic stays INSIDE Google network
-#   Does NOT go through internet or NAT
-#
-# THREE IP RANGES:
-#   Main:     10.0.2.0/24  — GKE node VMs
-#   Pods:     10.1.0.0/16  — pod IPs (temporary)
-#   Services: 10.2.0.0/16  — service IPs (permanent)
+#   Artifact Registry pulls stay inside Google network
+#   No NAT needed for GCP API calls
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_subnetwork" "private_subnet" {
   name                     = "${var.cluster_name}-private-subnet"
@@ -120,21 +87,6 @@ resource "google_compute_subnetwork" "private_subnet" {
 
 # ═══════════════════════════════════════════════════════════════
 # FIREWALL — ALLOW INTERNAL TRAFFIC
-# Allows ALL traffic between resources inside the VPC
-#
-# REQUIRED FOR:
-#   chat_front → chat_svc  (Socket.IO messages)
-#   chat_svc   → chat_db   (HTTP API calls)
-#   chat_db    → Cloud SQL (PostgreSQL port 5432)
-#   GKE nodes  → GKE nodes (cluster communication)
-#   Prometheus → all pods  (metrics scraping)
-#   Promtail   → Loki      (log shipping)
-#
-# source_ranges 10.0.0.0/8 covers ALL internal ranges:
-#   10.0.1.x (public subnet)
-#   10.0.2.x (private subnet)
-#   10.1.0.x (pods)
-#   10.2.0.x (services)
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_firewall" "allow_internal" {
   name    = "${var.cluster_name}-allow-internal"
@@ -159,13 +111,9 @@ resource "google_compute_firewall" "allow_internal" {
 
 # ═══════════════════════════════════════════════════════════════
 # FIREWALL — ALLOW HTTP AND HTTPS
-# Opens ports 80 and 443 to the internet
-# How users access chatms.store
-# All other ports blocked by default
-# Minimum attack surface — security best practice
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_firewall" "allow_http_https" {
-  #checkov:skip=CKV_GCP_106: Port 80 required for GCP load balancer health checks and HTTP→HTTPS redirect
+  #checkov:skip=CKV_GCP_106: Port 80 required for GCP load balancer health checks and HTTP to HTTPS redirect
   name    = "${var.cluster_name}-allow-http-https"
   network = google_compute_network.vpc.name
 
@@ -179,8 +127,6 @@ resource "google_compute_firewall" "allow_http_https" {
 
 # ═══════════════════════════════════════════════════════════════
 # CLOUD ROUTER
-# Virtual router required for NAT Gateway
-# Cannot create NAT Gateway without Cloud Router
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_router" "router" {
   name        = "${var.cluster_name}-router"
@@ -191,23 +137,9 @@ resource "google_compute_router" "router" {
 
 # ═══════════════════════════════════════════════════════════════
 # NAT GATEWAY
-# Provides OUTBOUND internet for private pods
-# OUTBOUND ONLY — internet cannot initiate inbound
-#
-# NEEDED FOR:
-#   pip install → PyPI (public internet)
-#   Any future external API calls from pods
-#
-# NOT NEEDED FOR (private_ip_google_access handles these):
-#   Artifact Registry — stays inside Google network
-#   Cloud SQL         — private VPC connection
-#   GCP Logging       — Google internal network
-#   GCP Monitoring    — Google internal network
-#
-# WHY KEEP IT:
-#   Standard best practice for private subnets
-#   Cheap insurance for future external calls
-#   pip install needs it during pod startup
+# NEEDED FOR: pip install PyPI external APIs
+# NOT NEEDED FOR: Artifact Registry Cloud SQL GCP APIs
+#   (handled by private_ip_google_access)
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_router_nat" "nat" {
   name                               = "${var.cluster_name}-nat"
@@ -229,25 +161,13 @@ resource "google_compute_router_nat" "nat" {
 
 # ═══════════════════════════════════════════════════════════════
 # GKE CLUSTER — Private Multi-Zone Regional
-# Runs all 3 microservice pods inside private subnet
-#
-# KEY DESIGN DECISIONS:
-#   REGIONAL          — control plane replicated across zones
-#   PRIVATE nodes     — no public IPs on worker VMs
-#   TWO ZONES         — zone-a AND zone-b (high availability)
-#   WORKLOAD IDENTITY — secure GCP auth without keys
-#
-# HIGH AVAILABILITY:
-#   If zone-a fails zone-b keeps serving traffic
-#   No single point of failure
 # ═══════════════════════════════════════════════════════════════
 #tfsec:ignore:google-container-enable-pod-security-policy
 resource "google_container_cluster" "gke" {
-  #checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev — restrict to VPN IP in production
-  #checkov:skip=CKV_GCP_65: Google Groups for RBAC requires Google Workspace — not available in dev project
-  #checkov:skip=CKV_GCP_66: Binary Authorization is an enterprise feature — out of scope for dev environment
-  #checkov:skip=CKV_GCP_69: Metadata server configured on node pool resource, not cluster resource
-  # PSP removed in K8s 1.25+ and google provider v6 — Network Policy (CALICO) provides equivalent controls
+  #checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev
+  #checkov:skip=CKV_GCP_65: Google Groups RBAC requires Google Workspace
+  #checkov:skip=CKV_GCP_66: Binary Authorization is enterprise feature
+  #checkov:skip=CKV_GCP_69: Metadata server on node pool not cluster
   name     = var.cluster_name
   location = var.region
 
@@ -312,14 +232,6 @@ resource "google_container_cluster" "gke" {
 
 # ═══════════════════════════════════════════════════════════════
 # GKE NODE POOL
-# Actual VM worker nodes that run your pods
-#
-# node_count = 1 PER ZONE
-# 2 zones = 2 nodes total minimum
-#
-# AUTOSCALING:
-#   min = 1 per zone → 2 nodes minimum
-#   max = 3 per zone → 6 nodes maximum
 # ═══════════════════════════════════════════════════════════════
 resource "google_container_node_pool" "nodes" {
   name     = "${var.cluster_name}-node-pool"
@@ -341,15 +253,15 @@ resource "google_container_node_pool" "nodes" {
       mode = "GKE_METADATA"
     }
 
+    shielded_instance_config {
+      enable_secure_boot          = true
+      enable_integrity_monitoring = true
+    }
+
     labels = {
       env        = "dev"
       project    = var.cluster_name
       managed-by = "terraform"
-    }
-
-    shielded_instance_config {
-      enable_secure_boot          = true
-      enable_integrity_monitoring = true
     }
 
     tags = ["gke-node", var.cluster_name]
@@ -368,9 +280,6 @@ resource "google_container_node_pool" "nodes" {
 
 # ═══════════════════════════════════════════════════════════════
 # PRIVATE SERVICE ACCESS — IP RANGE
-# Reserves a private IP range for Google managed services
-# Required for Cloud SQL to receive a private IP
-# Without this Cloud SQL can only get a public IP
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_global_address" "private_service_range" {
   name          = "${var.cluster_name}-private-service-range"
@@ -382,10 +291,8 @@ resource "google_compute_global_address" "private_service_range" {
 
 # ═══════════════════════════════════════════════════════════════
 # PRIVATE SERVICE ACCESS — VPC CONNECTION
-# Creates VPC peering with Google service network
-# Gives Cloud SQL a private IP inside our VPC
-# chat_db connects to Cloud SQL via private IP
-# No public internet exposure for database
+# deletion_policy ABANDON prevents destroy errors
+# Cloud SQL must be deleted before connection
 # ═══════════════════════════════════════════════════════════════
 resource "google_service_networking_connection" "private_vpc_connection" {
   network                 = google_compute_network.vpc.id
@@ -398,23 +305,12 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 
 # ═══════════════════════════════════════════════════════════════
 # CLOUD SQL — PostgreSQL 15
-# Managed database replacing SQLite from original repo
-#
-# UPGRADES FROM ORIGINAL REPO:
-#   SQLite     → PostgreSQL 15  (production grade)
-#   No backup  → Auto backup    (data protection)
-#   ZONAL      → REGIONAL HA    (high availability)
-#   Public IP  → Private IP     (security)
-#   No SSL     → SSL only       (encryption in transit)
-#
-# REGIONAL = primary zone-a + standby zone-b
-#   Auto-failover if zone-a fails
-#   Zero downtime maintenance
+# REGIONAL HA private IP SSL only
 # ═══════════════════════════════════════════════════════════════
 resource "google_sql_database_instance" "postgres" {
-  #checkov:skip=CKV_GCP_79: POSTGRES_15 is our chosen stable version; upgrading to 16 requires testing
-  #checkov:skip=CKV_GCP_6: ssl_mode=ENCRYPTED_ONLY is stricter than require_ssl — checkov does not recognise the newer attribute
-  #checkov:skip=CKV_GCP_55: CKV_GCP_55 conflicts with CKV_GCP_109 in checkov 3.2.527 — ERROR satisfies CKV_GCP_109 (stricter) but incorrectly fails CKV_GCP_55
+  #checkov:skip=CKV_GCP_79: POSTGRES_15 chosen stable version
+  #checkov:skip=CKV_GCP_6: ssl_mode=ENCRYPTED_ONLY is stricter than require_ssl
+  #checkov:skip=CKV_GCP_55: Conflicts with CKV_GCP_109 — ERROR satisfies 109
   name             = var.db_instance_name
   database_version = "POSTGRES_15"
   region           = var.region
@@ -468,6 +364,16 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     database_flags {
+      name  = "log_temp_files"
+      value = "0"
+    }
+
+    database_flags {
+      name  = "log_min_duration_statement"
+      value = "-1"
+    }
+
+    database_flags {
       name  = "log_statement"
       value = "all"
     }
@@ -499,8 +405,6 @@ resource "google_sql_database_instance" "postgres" {
 
 # ═══════════════════════════════════════════════════════════════
 # DATABASE — chatdb
-# Actual PostgreSQL database inside the Cloud SQL server
-# Where all chat messages are stored permanently
 # ═══════════════════════════════════════════════════════════════
 resource "google_sql_database" "chatdb" {
   name     = var.db_name
@@ -509,9 +413,6 @@ resource "google_sql_database" "chatdb" {
 
 # ═══════════════════════════════════════════════════════════════
 # DATABASE USER — chatuser
-# Login credentials for chat_db pod
-# Password injected via Kubernetes Secret
-# Never hardcoded in application code
 # ═══════════════════════════════════════════════════════════════
 resource "google_sql_user" "chatuser" {
   name     = var.db_user
@@ -521,10 +422,6 @@ resource "google_sql_user" "chatuser" {
 
 # ═══════════════════════════════════════════════════════════════
 # STATIC IP FOR LOAD BALANCER
-# Permanent public IP for Cloud Load Balancer
-# DNS A record always points to this IP
-# Even if LB recreated IP stays the same
-# Without static IP DNS breaks when LB IP changes
 # ═══════════════════════════════════════════════════════════════
 resource "google_compute_global_address" "lb_ip" {
   name        = "${var.cluster_name}-lb-ip"
@@ -534,14 +431,7 @@ resource "google_compute_global_address" "lb_ip" {
 
 # ═══════════════════════════════════════════════════════════════
 # CLOUD DNS MANAGED ZONE
-# GCP equivalent of AWS Route 53
-# Manages all DNS records for chatms.store
-#
-# AFTER terraform apply:
-#   terraform output dns_nameservers
-#   Go to GoDaddy → chatms.store → Manage DNS
-#   Change to Google Cloud DNS nameservers
-#   Wait 24-48 hours for DNS propagation
+# DNSSEC enabled for domain security
 # ═══════════════════════════════════════════════════════════════
 resource "google_dns_managed_zone" "chat_zone" {
   name        = "${var.cluster_name}-dns-zone"
@@ -556,9 +446,9 @@ resource "google_dns_managed_zone" "chat_zone" {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# DNS A RECORD — ROOT DOMAIN
-# Points chatms.store to Load Balancer static IP
-# TTL 300 = changes propagate within 5 minutes
+# DNS A RECORDS
+# All subdomains point to same Load Balancer IP
+# NGINX Ingress routes by hostname
 # ═══════════════════════════════════════════════════════════════
 resource "google_dns_record_set" "chat_a_record" {
   name         = "${var.domain_name}."
@@ -569,11 +459,6 @@ resource "google_dns_record_set" "chat_a_record" {
   rrdatas      = [google_compute_global_address.lb_ip.address]
 }
 
-# ═══════════════════════════════════════════════════════════════
-# DNS A RECORD — WWW SUBDOMAIN
-# Points www.chatms.store to same Load Balancer IP
-# Users who type www. still reach the app
-# ═══════════════════════════════════════════════════════════════
 resource "google_dns_record_set" "chat_www_record" {
   name         = "www.${var.domain_name}."
   type         = "A"
@@ -583,33 +468,30 @@ resource "google_dns_record_set" "chat_www_record" {
   rrdatas      = [google_compute_global_address.lb_ip.address]
 }
 
+resource "google_dns_record_set" "argocd_a_record" {
+  name         = "argocd.${var.domain_name}."
+  type         = "A"
+  ttl          = 300
+  managed_zone = google_dns_managed_zone.chat_zone.name
+  project      = var.project_id
+  rrdatas      = [google_compute_global_address.lb_ip.address]
+}
+
+resource "google_dns_record_set" "grafana_a_record" {
+  name         = "grafana.${var.domain_name}."
+  type         = "A"
+  ttl          = 300
+  managed_zone = google_dns_managed_zone.chat_zone.name
+  project      = var.project_id
+  rrdatas      = [google_compute_global_address.lb_ip.address]
+}
+
 # ═══════════════════════════════════════════════════════════════
 # GOOGLE ARTIFACT REGISTRY — Private Docker Registry
-# Replaces public Docker Hub
-#
-# WHY PRIVATE REGISTRY OVER DOCKER HUB:
-#   Private    — only GCP account can access images
-#   Faster     — GKE pulls via private_ip_google_access
-#                stays inside Google network
-#                NO NAT needed for image pulls
-#   Secure     — integrated with Workload Identity
-#   No limits  — no Docker Hub rate limiting
-#   Scanning   — built-in vulnerability scanning
-#
-# HOW GKE PULLS IMAGES WITHOUT NAT:
-#   private_ip_google_access = true on private subnet
-#   GKE reaches Artifact Registry via Google internal network
-#   Traffic never leaves Google infrastructure
-#   No internet required — no NAT required
-#
-# IMAGE PATH FORMAT:
-#   us-central1-docker.pkg.dev/
-#   microservices-chat/
-#   chat-platform-cluster-registry/
-#   chat-front:SHA
+# GKE pulls via private_ip_google_access — no NAT needed
 # ═══════════════════════════════════════════════════════════════
 resource "google_artifact_registry_repository" "chat_registry" {
-  #checkov:skip=CKV_GCP_84: CSEK requires customer-managed KMS keys — out of scope for dev; Google-managed encryption is sufficient
+  #checkov:skip=CKV_GCP_84: CSEK out of scope for dev — Google-managed encryption sufficient
   project       = var.project_id
   location      = var.region
   repository_id = "${var.cluster_name}-registry"
@@ -624,18 +506,7 @@ resource "google_artifact_registry_repository" "chat_registry" {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# IAM — ALLOW GKE NODES TO PULL IMAGES
-# Grants GKE default service account
-# reader permission on Artifact Registry
-#
-# reader role — pull images ONLY
-# Cannot push delete or manage repository
-# Least privilege principle applied
-#
-# Authentication flow:
-#   GKE node → Workload Identity → IAM check
-#   IAM confirms reader role → image pulled
-#   No keys or credentials stored anywhere
+# IAM — GKE NODES PULL IMAGES (reader role)
 # ═══════════════════════════════════════════════════════════════
 resource "google_artifact_registry_repository_iam_member" "gke_reader" {
   project    = var.project_id
@@ -646,19 +517,7 @@ resource "google_artifact_registry_repository_iam_member" "gke_reader" {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# IAM — ALLOW GITHUB ACTIONS TO PUSH IMAGES
-# Grants GitHub Actions service account
-# writer permission on Artifact Registry
-#
-# writer role — push and pull images
-# Cannot delete images or manage repository
-# Least privilege principle applied
-#
-# Authentication flow:
-#   GitHub Actions → Workload Identity Federation
-#   → IAM check → writer role confirmed
-#   → image pushed to registry
-#   No JSON keys stored anywhere
+# IAM — GITHUB ACTIONS PUSH IMAGES (writer role)
 # ═══════════════════════════════════════════════════════════════
 resource "google_artifact_registry_repository_iam_member" "github_writer" {
   project    = var.project_id
@@ -667,32 +526,4 @@ resource "google_artifact_registry_repository_iam_member" "github_writer" {
   role       = "roles/artifactregistry.writer"
   member     = "serviceAccount:github-actions@microservices-chat.iam.gserviceaccount.com"
 }
-# ═══════════════════════════════════════════════════════════════
-# DNS A RECORD — ARGOCD SUBDOMAIN
-# Points argocd.chatms.store to same Load Balancer IP
-# ArgoCD accessible at https://argocd.chatms.store
-# ═══════════════════════════════════════════════════════════════
-resource "google_dns_record_set" "argocd_a_record" {
-  name         = "argocd.${var.domain_name}."
-  type         = "A"
-  ttl          = 300
-  managed_zone = google_dns_managed_zone.chat_zone.name
-  project      = var.project_id
-  rrdatas      = [google_compute_global_address.lb_ip.address]
-}
 
-
-# ═══════════════════════════════════════════════════════════════
-# DNS A RECORD — GRAFANA SUBDOMAIN
-# Points grafana.chatms.store to same Load Balancer IP
-# Grafana accessible at https://grafana.chatms.store
-# Adding now so SSL cert covers all subdomains
-# ═══════════════════════════════════════════════════════════════
-resource "google_dns_record_set" "grafana_a_record" {
-  name         = "grafana.${var.domain_name}."
-  type         = "A"
-  ttl          = 300
-  managed_zone = google_dns_managed_zone.chat_zone.name
-  project      = var.project_id
-  rrdatas      = [google_compute_global_address.lb_ip.address]
-}
