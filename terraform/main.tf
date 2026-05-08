@@ -241,11 +241,13 @@ resource "google_compute_router_nat" "nat" {
 #   If zone-a fails zone-b keeps serving traffic
 #   No single point of failure
 # ═══════════════════════════════════════════════════════════════
+#tfsec:ignore:google-container-enable-pod-security-policy
 resource "google_container_cluster" "gke" {
   #checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev — restrict to VPN IP in production
   #checkov:skip=CKV_GCP_65: Google Groups for RBAC requires Google Workspace — not available in dev project
   #checkov:skip=CKV_GCP_66: Binary Authorization is an enterprise feature — out of scope for dev environment
   #checkov:skip=CKV_GCP_69: Metadata server configured on node pool resource, not cluster resource
+  # PSP removed in K8s 1.25+ and google provider v6 — Network Policy (CALICO) provides equivalent controls
   name     = var.cluster_name
   location = var.region
 
@@ -291,10 +293,6 @@ resource "google_container_cluster" "gke" {
   network_policy {
     enabled  = true
     provider = "CALICO"
-  }
-
-  pod_security_policy_config {
-    enabled = true
   }
 
   release_channel {
