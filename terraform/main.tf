@@ -293,6 +293,10 @@ resource "google_container_cluster" "gke" {
     provider = "CALICO"
   }
 
+  pod_security_policy_config {
+    enabled = true
+  }
+
   release_channel {
     channel = "REGULAR"
   }
@@ -462,7 +466,7 @@ resource "google_sql_database_instance" "postgres" {
 
     database_flags {
       name  = "log_min_messages"
-      value = "ERROR"
+      value = "error"
     }
 
     database_flags {
