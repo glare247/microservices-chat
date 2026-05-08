@@ -164,8 +164,8 @@ resource "google_compute_firewall" "allow_internal" {
 # All other ports blocked by default
 # Minimum attack surface — security best practice
 # ═══════════════════════════════════════════════════════════════
-#checkov:skip=CKV_GCP_106: Port 80 required for GCP load balancer health checks and HTTP→HTTPS redirect
 resource "google_compute_firewall" "allow_http_https" {
+  #checkov:skip=CKV_GCP_106: Port 80 required for GCP load balancer health checks and HTTP→HTTPS redirect
   name    = "${var.cluster_name}-allow-http-https"
   network = google_compute_network.vpc.name
 
@@ -241,10 +241,11 @@ resource "google_compute_router_nat" "nat" {
 #   If zone-a fails zone-b keeps serving traffic
 #   No single point of failure
 # ═══════════════════════════════════════════════════════════════
-#checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev — restrict to VPN IP in production
-#checkov:skip=CKV_GCP_65: Google Groups for RBAC requires Google Workspace — not available in dev project
-#checkov:skip=CKV_GCP_66: Binary Authorization is an enterprise feature — out of scope for dev environment
 resource "google_container_cluster" "gke" {
+  #checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev — restrict to VPN IP in production
+  #checkov:skip=CKV_GCP_65: Google Groups for RBAC requires Google Workspace — not available in dev project
+  #checkov:skip=CKV_GCP_66: Binary Authorization is an enterprise feature — out of scope for dev environment
+  #checkov:skip=CKV_GCP_69: Metadata server configured on node pool resource, not cluster resource
   name     = var.cluster_name
   location = var.region
 
@@ -285,6 +286,11 @@ resource "google_container_cluster" "gke" {
     client_certificate_config {
       issue_client_certificate = false
     }
+  }
+
+  network_policy {
+    enabled  = true
+    provider = "CALICO"
   }
 
   deletion_protection = false
