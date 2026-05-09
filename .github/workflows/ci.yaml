@@ -270,6 +270,9 @@ jobs:
     timeout-minutes: 10
     if: github.ref == 'refs/heads/master'
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
