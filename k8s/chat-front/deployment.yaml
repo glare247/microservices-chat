@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: chat-front
-          image: us-central1-docker.pkg.dev/microservices-chat/chat-platform-cluster-registry/chat-front:64d5488881c5a01ee18081d786f1c0f131d296f3
+          image: us-central1-docker.pkg.dev/microservices-chat/chat-platform-cluster-registry/chat-front:36b3dfdc890195a75e7c4cfee7f541110640b91a
           ports:
             - containerPort: 8080
           env:
