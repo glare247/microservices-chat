@@ -33,6 +33,7 @@ resource "google_iam_workload_identity_pool" "github_pool" {
 }
 
 resource "google_iam_workload_identity_pool_provider" "github_provider" {
+  #checkov:skip=CKV_GCP_125: condition restricts to specific owner and repo via variables — checkov cannot resolve tfvars in CI
   workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-provider"
   display_name                       = "GitHub Provider"
