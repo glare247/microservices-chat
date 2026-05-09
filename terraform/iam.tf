@@ -18,10 +18,6 @@
 #     "projects/microservices-chat/serviceAccounts/github-actions@microservices-chat.iam.gserviceaccount.com roles/iam.workloadIdentityUser principalSet://iam.googleapis.com/projects/684406960663/locations/global/workloadIdentityPools/github-pool/attribute.repository/glare247/microservices-chat"
 # ═══════════════════════════════════════════════════════════════
 
-data "google_project" "project" {
-  project_id = var.project_id
-}
-
 resource "google_service_account" "github_actions" {
   account_id   = "github-actions"
   display_name = "GitHub Actions CI"
