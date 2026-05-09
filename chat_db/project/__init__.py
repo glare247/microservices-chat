@@ -1,24 +1,41 @@
-from pyms.flask.app import Microservice
+import os
+from flask import Flask
 from project.models.init_db import db
-
 
 __author__ = "Alberto Vara"
 __email__ = "a.vara.1986@gmail.com"
 __version__ = "0.1.0"
 
 
-class MyMicroservice(Microservice):
-    def init_libs(self):
-        db.init_app(self.application)
-        with self.application.test_request_context():
-            db.create_all()
-
-
 def create_app():
-    """Initialize the Flask app, register blueprints and intialize all libraries like Swagger, database, the trace system...
-    return the app and the database objects.
-    :return:
-    """
-    ms = MyMicroservice(path=__file__)
+    """Initialize Flask app with SQLAlchemy database.
+    Reads config from environment variables.
+    No py-ms dependency — uses Flask directly.
 
-    return ms.create_app()
+    :return: Flask app
+    """
+    app = Flask(__name__)
+
+    app.secret_key = os.environ.get(
+        "SECRET_KEY",
+        "default-secret-key"
+    )
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "SQLALCHEMY_DATABASE_URI",
+        "sqlite:///chat.db"
+    )
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+
+    from project.views import messages_bp
+    app.register_blueprint(messages_bp)
+
+    @app.route("/health")
+    def health():
+        return {"status": "healthy"}, 200
+
+    return app

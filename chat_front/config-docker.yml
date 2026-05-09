@@ -1,11 +1,3 @@
-pyms:
-  services:
-    requests:
-      data: ""
-  config:
-    DEBUG: false
-    TESTING: false
-    APP_NAME: project
-    APPLICATION_ROOT: /
-    SECRET_KEY: ${SECRET_KEY}
-    service_host: ${CHAT_SVC_HOST}
+# Config kept for backward compatibility
+# All values now read from environment variables
+# SECRET_KEY and CHAT_SVC_HOST injected via K8s Secret

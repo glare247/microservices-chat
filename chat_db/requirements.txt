@@ -1,10 +1,6 @@
-# Web framework
+Flask==3.0.3
 Flask-SQLAlchemy==3.0.5
 SQLAlchemy==2.0.23
 Flask-Script==2.0.6
-
-# PostgreSQL driver — replaces SQLite
 psycopg2-binary==2.9.9
-
-# PyMS microservice framework
-py-ms[all]>=2.6.1
+requests==2.32.3

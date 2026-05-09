@@ -19,7 +19,7 @@ RUN mkdir -p $APP_HOME && \
 WORKDIR $APP_HOME
 
 COPY requirements*.txt $APP_HOME
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade pip setuptools wheel==0.46.2 && \
     pip install --no-cache-dir -r requirements-docker.txt
 
 COPY . $APP_HOME
