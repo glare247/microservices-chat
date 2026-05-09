@@ -21,4 +21,5 @@ db_tier          = "db-f1-micro"
 #   export TF_VAR_db_password="your-password"
 #   terraform apply
 
-domain_name = "chatms.store"
+domain_name       = "chatms.store"
+github_repository = "owner/repo"

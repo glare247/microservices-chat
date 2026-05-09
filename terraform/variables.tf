@@ -95,3 +95,8 @@ variable "domain_name" {
   description = "Domain name for the chat platform"
   type        = string
 }
+
+variable "github_repository" {
+  description = "GitHub repository in owner/repo format — used to scope WIF access"
+  type        = string
+}

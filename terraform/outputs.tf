@@ -235,3 +235,18 @@ output "artifact_registry_chat_db" {
   description = "Full image path for chat_db — use in K8s deployment manifest"
   value       = "${var.region}-docker.pkg.dev/${var.project_id}/${var.cluster_name}-registry/chat-db"
 }
+
+# ═══════════════════════════════════════════════════════════════
+# GITHUB ACTIONS SECRETS
+# Copy these values into GitHub → Settings → Secrets
+# ═══════════════════════════════════════════════════════════════
+
+output "gcp_workload_identity_provider" {
+  description = "Value for GCP_WORKLOAD_IDENTITY_PROVIDER GitHub secret"
+  value       = google_iam_workload_identity_pool_provider.github_provider.name
+}
+
+output "gcp_service_account" {
+  description = "Value for GCP_SERVICE_ACCOUNT GitHub secret"
+  value       = google_service_account.github_actions.email
+}

@@ -32,5 +32,5 @@ resource "google_artifact_registry_repository_iam_member" "github_writer" {
   location   = var.region
   repository = google_artifact_registry_repository.chat_registry.name
   role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:github-actions@microservices-chat.iam.gserviceaccount.com"
+  member     = "serviceAccount:${google_service_account.github_actions.email}"
 }
