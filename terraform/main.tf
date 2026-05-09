@@ -1,5 +1,6 @@
 # ═══════════════════════════════════════════════════════════════
 # TERRAFORM CONFIGURATION
+# Backend: GCS bucket microservices-chat-tfstate
 # Provider and data sources only
 # All resources split into dedicated files:
 #   networking.tf — VPC subnets firewall
@@ -17,6 +18,11 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+  }
+
+  backend "gcs" {
+    bucket = "microservices-chat-tfstate"
+    prefix = "terraform/state"
   }
 }
 
