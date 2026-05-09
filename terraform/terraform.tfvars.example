@@ -22,4 +22,5 @@ db_tier          = "db-f1-micro"
 #   terraform apply
 
 domain_name       = "chatms.store"
-github_repository = "owner/repo"
+github_repository       = "owner/repo"
+github_repository_owner = "owner"

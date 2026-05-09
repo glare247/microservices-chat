@@ -100,3 +100,8 @@ variable "github_repository" {
   description = "GitHub repository in owner/repo format — used to scope WIF access"
   type        = string
 }
+
+variable "github_repository_owner" {
+  description = "GitHub repository owner — used to scope WIF access to a specific org/user"
+  type        = string
+}
