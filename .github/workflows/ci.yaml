@@ -9,7 +9,7 @@ on:
 env:
   IMAGE_TAG:  ${{ github.sha }}
   REGISTRY:   us-central1-docker.pkg.dev
-  PROJECT_ID: microservices-chat
+  PROJECT_ID: microservices-chat-496017
   REPOSITORY: chat-platform-cluster-registry
   REGION:     us-central1
 
