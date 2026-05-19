@@ -1,0 +1,57 @@
+name: CI — Security Nightly
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  REGISTRY:   us-central1-docker.pkg.dev
+  PROJECT_ID: microservices-chat-496017
+  REPOSITORY: chat-platform-cluster-registry
+
+jobs:
+
+# ═══════════════════════════════════════════
+# NIGHTLY SECURITY SCAN
+# ═══════════════════════════════════════════
+  security-scan:
+    name: Nightly Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: pip-audit — full dependency scan
+        run: |
+          pip install pip-audit
+          pip-audit \
+            -r chat_db/requirements.txt \
+            -r chat_svc/requirements.txt \
+            -r chat_front/requirements.txt
+
+      - name: trufflehog — full history secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ""
+          head: HEAD
+          extra_args: --only-verified
+
+      - name: Trivy — scan latest images
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/chat-front:latest
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true

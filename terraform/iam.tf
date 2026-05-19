@@ -3,19 +3,7 @@
 # Keyless auth for CI pipeline — no long-lived credentials
 # Pool: github-pool / Provider: github-provider
 # Service account: github-actions@microservices-chat.iam.gserviceaccount.com
-#
-# IMPORT EXISTING RESOURCES (run once):
-#   terraform import google_service_account.github_actions \
-#     projects/microservices-chat/serviceAccounts/github-actions@microservices-chat.iam.gserviceaccount.com
-#
-#   terraform import google_iam_workload_identity_pool.github_pool \
-#     projects/684406960663/locations/global/workloadIdentityPools/github-pool
-#
-#   terraform import google_iam_workload_identity_pool_provider.github_provider \
-#     projects/684406960663/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-#
-#   terraform import google_service_account_iam_member.github_wif_binding \
-#     "projects/microservices-chat/serviceAccounts/github-actions@microservices-chat.iam.gserviceaccount.com roles/iam.workloadIdentityUser principalSet://iam.googleapis.com/projects/684406960663/locations/global/workloadIdentityPools/github-pool/attribute.repository/glare247/microservices-chat"
+
 # ═══════════════════════════════════════════════════════════════
 
 resource "google_service_account" "github_actions" {
