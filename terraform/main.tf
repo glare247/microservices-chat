@@ -12,7 +12,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "microservices-chat-tfstate"
+    bucket = "kabiru-devops-tfstate-001"
     prefix = "terraform/state"
   }
 }
