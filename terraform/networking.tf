@@ -70,6 +70,7 @@ resource "google_compute_firewall" "allow_internal" {
 }
 
 resource "google_compute_firewall" "allow_http_https" {
+  #checkov:skip=CKV_GCP_106: Port 80 required for GCP load balancer health checks and HTTP to HTTPS redirect
   
   name    = "${var.cluster_name}-allow-http-https"
   network = google_compute_network.vpc.name

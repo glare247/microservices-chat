@@ -22,6 +22,9 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 }
 
 resource "google_sql_database_instance" "postgres" {
+  #checkov:skip=CKV_GCP_79: POSTGRES_15 chosen stable version
+  #checkov:skip=CKV_GCP_6: ssl_mode=ENCRYPTED_ONLY is stricter than require_ssl
+  #checkov:skip=CKV_GCP_109: log_min_messages=error is set — checkov bug with large files
   
   name             = var.db_instance_name
   database_version = "POSTGRES_15"

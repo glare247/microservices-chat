@@ -5,6 +5,11 @@
 
 
 resource "google_container_cluster" "gke" {
+  #checkov:skip=CKV_GCP_18: Public endpoint required for kubectl access in dev
+  #checkov:skip=CKV_GCP_65: Google Groups RBAC requires Google Workspace
+  #checkov:skip=CKV_GCP_66: Binary Authorization is enterprise feature
+  #checkov:skip=CKV_GCP_69: Metadata server on node pool not cluster
+  #checkov:skip=CKV_GCP_12: Network policy cannot be enabled on existing cluster
   
   name     = var.cluster_name
   location = var.region
