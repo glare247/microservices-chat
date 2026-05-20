@@ -138,7 +138,7 @@ resource "google_project_iam_member" "github_dns_admin" {
 # ═══════════════════════════════════════════════════════════════
 resource "google_project_iam_member" "github_sa_admin" {
   project = var.project_id
-  role    = "roles/iam.serviceAccountAdmin"
+  role    = "roles/iam.serviceAccountTokenCreator"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
