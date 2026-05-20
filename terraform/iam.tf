@@ -26,7 +26,6 @@ resource "google_service_account" "github_actions" {
 # ═══════════════════════════════════════════════════════════════
 # WORKLOAD IDENTITY POOL
 # Security zone that GitHub is allowed to enter
-# Container for trust relationships
 # ═══════════════════════════════════════════════════════════════
 resource "google_iam_workload_identity_pool" "github_pool" {
   workload_identity_pool_id = "github-pool"
@@ -74,7 +73,7 @@ resource "google_service_account_iam_member" "github_wif_binding" {
 
 # ═══════════════════════════════════════════════════════════════
 # IAM — Artifact Registry Writer
-# GitHub Actions can push Docker images to registry
+# GitHub Actions pushes Docker images to registry
 # ═══════════════════════════════════════════════════════════════
 resource "google_project_iam_member" "github_artifact_writer" {
   project = var.project_id
@@ -84,8 +83,7 @@ resource "google_project_iam_member" "github_artifact_writer" {
 
 # ═══════════════════════════════════════════════════════════════
 # IAM — Storage Object Admin
-# GitHub Actions can read and write Terraform state
-# in GCS bucket
+# GitHub Actions reads and writes Terraform state in GCS
 # ═══════════════════════════════════════════════════════════════
 resource "google_project_iam_member" "github_storage_admin" {
   project = var.project_id
@@ -94,12 +92,62 @@ resource "google_project_iam_member" "github_storage_admin" {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# IAM — Editor
-# GitHub Actions can run terraform apply
-# Create and manage GCP resources
+# IAM — Compute Admin
+# GitHub Actions manages GKE and compute resources via terraform
+# More specific than roles/editor
 # ═══════════════════════════════════════════════════════════════
-resource "google_project_iam_member" "github_editor" {
+resource "google_project_iam_member" "github_compute_admin" {
   project = var.project_id
-  role    = "roles/editor"
+  role    = "roles/compute.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Container Admin
+# GitHub Actions manages GKE cluster via terraform
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_container_admin" {
+  project = var.project_id
+  role    = "roles/container.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Cloud SQL Admin
+# GitHub Actions manages Cloud SQL via terraform
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_cloudsql_admin" {
+  project = var.project_id
+  role    = "roles/cloudsql.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — DNS Admin
+# GitHub Actions manages Cloud DNS via terraform
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_dns_admin" {
+  project = var.project_id
+  role    = "roles/dns.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Service Account Admin
+# GitHub Actions manages service accounts via terraform
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_sa_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Service Networking Admin
+# GitHub Actions manages VPC peering for Cloud SQL
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_servicenetworking" {
+  project = var.project_id
+  role    = "roles/servicenetworking.networksAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
