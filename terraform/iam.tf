@@ -135,12 +135,6 @@ resource "google_project_iam_member" "github_dns_admin" {
 # ═══════════════════════════════════════════════════════════════
 # IAM — Service Account Admin
 # GitHub Actions manages service accounts via terraform
-# ═══════════════════════════════════════════════════════════════
-resource "google_project_iam_member" "github_sa_admin" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountTokenCreator"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
 
 # ═══════════════════════════════════════════════════════════════
 # IAM — Service Networking Admin
