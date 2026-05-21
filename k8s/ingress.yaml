@@ -6,8 +6,7 @@ metadata:
   annotations:
     kubernetes.io/ingress.global-static-ip-name: chat-platform-cluster-lb-ip
     networking.gke.io/managed-certificates: chat-certificate
-    kubernetes.io/ingress.allow-http: "false"
-    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
 spec:
   rules:
     - host: chatms.store
@@ -20,13 +19,7 @@ spec:
                 name: chat-front
                 port:
                   number: 80
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: chat-svc
-                port:
-                  number: 80
+
     - host: www.chatms.store
       http:
         paths:
@@ -35,5 +28,27 @@ spec:
             backend:
               service:
                 name: chat-front
+                port:
+                  number: 80
+
+    - host: argocd.chatms.store
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server-external
+                port:
+                  number: 80
+
+    - host: grafana.chatms.store
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-external
                 port:
                   number: 80
