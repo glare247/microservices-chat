@@ -145,3 +145,34 @@ resource "google_project_iam_member" "github_servicenetworking" {
   role    = "roles/servicenetworking.networksAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Project IAM Admin
+# GitHub Actions can manage project level IAM policies
+# Required for terraform to manage google_project_iam_member
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_iam_admin" {
+  project = var.project_id
+  role    = "roles/resourcemanager.projectIamAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Workload Identity Pool Admin
+# GitHub Actions can manage WIF pools via terraform
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_wif_admin" {
+  project = var.project_id
+  role    = "roles/iam.workloadIdentityPoolAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# IAM — Artifact Registry Admin
+# GitHub Actions can manage registry IAM policies via terraform
+# ═══════════════════════════════════════════════════════════════
+resource "google_project_iam_member" "github_registry_admin" {
+  project = var.project_id
+  role    = "roles/artifactregistry.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
