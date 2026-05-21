@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: chat-db
-          image: us-central1-docker.pkg.dev/microservices-chat-496017/chat-platform-cluster-registry/chat-db:1eab5837e9ec31c03f5811e040601c6e49df2060
+          image: us-central1-docker.pkg.dev/microservices-chat-496017/chat-platform-cluster-registry/chat-db:3ec2e1ff9c1033fae4b83329cc743c83876c15db
           ports:
             - containerPort: 8080
           env:
