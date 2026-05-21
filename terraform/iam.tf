@@ -77,7 +77,7 @@ resource "google_service_account_iam_member" "github_wif_binding" {
 # ═══════════════════════════════════════════════════════════════
 resource "google_project_iam_member" "github_artifact_writer" {
   project = var.project_id
-  role    = "roles/artifactregistry.writer"
+  role    = "roles/artifactregistry.repoAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
