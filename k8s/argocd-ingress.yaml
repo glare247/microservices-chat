@@ -1,39 +1,28 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: chat-ingress
-  namespace: chat-app
+  name: argocd-ingress
+  namespace: argocd
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - chatms.store
-        - www.chatms.store
-      secretName: chat-tls
+        - argocd.chatms.store
+      secretName: argocd-tls
   rules:
-    - host: chatms.store
+    - host: argocd.chatms.store
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: chat-front
-                port:
-                  number: 80
-    - host: www.chatms.store
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: chat-front
+                name: argocd-server
                 port:
                   number: 80
