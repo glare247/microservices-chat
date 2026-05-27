@@ -1,0 +1,28 @@
+# ═══════════════════════════════════════
+# PROMETHEUS HELM VALUES
+# Scrapes metrics from all pods
+# ═══════════════════════════════════════
+
+server:
+  persistentVolume:
+    size: 10Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 200m
+  retention: "15d"
+
+alertmanager:
+  enabled: false
+
+pushgateway:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
