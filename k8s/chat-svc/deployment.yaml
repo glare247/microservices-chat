@@ -19,10 +19,14 @@ spec:
     metadata:
       labels:
         app: chat-svc
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: chat-svc
-          image: us-central1-docker.pkg.dev/microservices-chat-496017/chat-platform-cluster-registry/chat-svc:3ec2e1ff9c1033fae4b83329cc743c83876c15db
+          image: us-central1-docker.pkg.dev/microservices-chat-496017/chat-platform-cluster-registry/chat-svc:latest
           ports:
             - containerPort: 8080
           env:
@@ -38,22 +42,20 @@ spec:
                   key: CHAT_DB_HOST
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              memory: "128Mi"
+              cpu: "100m"
             limits:
-              cpu: 500m
-              memory: 256Mi
+              memory: "256Mi"
+              cpu: "200m"
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 15
+            initialDelaySeconds: 10
             periodSeconds: 10
-            failureThreshold: 3
