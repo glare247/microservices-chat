@@ -7,6 +7,7 @@ from flask import current_app
 from flask import jsonify
 from flask import session
 from flask_socketio import emit, send, SocketIO
+from prometheus_flask_exporter import PrometheusMetrics
 
 __author__ = "Alberto Vara"
 __email__ = "a.vara.1986@gmail.com"
@@ -15,6 +16,14 @@ __version__ = "0.1.0"
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "default-secret-key")
 SERVICE_HOST = os.environ.get("CHAT_DB_HOST", "http://chat-db:80")
+
+# Initialize Prometheus metrics
+# Creates /metrics endpoint automatically
+# Tracks all HTTP requests to chat_svc
+metrics = PrometheusMetrics(app)
+
+# Static information as metric
+metrics.info('chat_svc_info', 'Chat Service Application Info', version='1.0.0')
 
 socketio = SocketIO()
 users_connected = []

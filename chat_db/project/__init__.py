@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from project.models.init_db import db
+from prometheus_flask_exporter import PrometheusMetrics
 
 __author__ = "Alberto Vara"
 __email__ = "a.vara.1986@gmail.com"
@@ -27,6 +28,17 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
+
+    # Initialize Prometheus metrics
+    # Creates /metrics endpoint automatically
+    # Tracks all HTTP requests to chat_db
+    # Must be initialized after app is created
+    metrics = PrometheusMetrics(app)
+    metrics.info(
+        'chat_db_info',
+        'Chat DB Application Info',
+        version='1.0.0'
+    )
 
     with app.app_context():
         db.create_all()

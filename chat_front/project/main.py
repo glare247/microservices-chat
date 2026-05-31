@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from flask import url_for
 from flask import render_template
+from prometheus_flask_exporter import PrometheusMetrics
 
 __author__ = "Alberto Vara"
 __email__ = "a.vara.1986@gmail.com"
@@ -10,6 +11,15 @@ __version__ = "0.1.0"
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "default-secret-key")
 SERVICE_HOST = os.environ.get("CHAT_SVC_HOST", "http://chat-svc:80")
+
+# Initialize Prometheus metrics
+# This automatically creates /metrics endpoint
+# Prometheus will scrape this endpoint
+# to collect request counts response times errors
+metrics = PrometheusMetrics(app)
+
+# Static information as metric
+metrics.info('chat_front_info', 'Chat Front Application Info', version='1.0.0')
 
 
 @app.route("/")

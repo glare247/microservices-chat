@@ -4,3 +4,4 @@ SQLAlchemy==2.0.23
 Flask-Script==2.0.6
 psycopg2-binary==2.9.9
 requests==2.33.0
+prometheus-flask-exporter==0.23.1
