@@ -1,7 +1,6 @@
 # ═══════════════════════════════════════
 # GRAFANA HELM VALUES
 # Accessible at grafana.chatms.store
-# Connects to Prometheus and Loki
 # ═══════════════════════════════════════
 
 adminUser: admin
@@ -41,17 +40,28 @@ dashboardProviders:
 
 dashboards:
   default:
-    kubernetes-cluster:
-      gnetId: 7249
-      revision: 1
+    # KEPT: Node exporter full
+    # Shows CPU memory disk network
+    # per node - FULLY WORKING
+    node-exporter:
+      gnetId: 1860
+      revision: 37
       datasource: Prometheus
-    kubernetes-pods:
-      gnetId: 6417
-      revision: 1
-      datasource: Prometheus
+
+    # KEPT: NGINX Ingress dashboard
+    # Shows request volume connections
+    # error rates - FULLY WORKING
     nginx-ingress:
       gnetId: 9614
       revision: 1
+      datasource: Prometheus
+
+    # ADDED: Kubernetes cluster monitoring
+    # Shows cluster memory CPU network
+    # WORKING: memory 45.2% CPU 1.03%
+    cluster-monitoring:
+      gnetId: 3119
+      revision: 2
       datasource: Prometheus
 
 persistence:
