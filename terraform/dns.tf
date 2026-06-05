@@ -10,30 +10,41 @@
 # ═══════════════════════════════════════════════════════════════
 
 # ───────────────────────────────────────────────────────────────
-# OLD GCE GLOBAL IP (kept in state but no longer used)
-# REASON: Originally used for GCE Ingress Controller
-#         Migrated to NGINX Ingress which uses Regional IP
-#         Cannot delete until removed from terraform state
+# OLD GCE GLOBAL IP
+# REASON: Originally created for GCE Ingress Controller
+#         No longer used after migrating to NGINX Ingress
+#         Kept in state to avoid destroy/recreate cycle
+#         DNS records no longer reference this IP
 # ───────────────────────────────────────────────────────────────
 resource "google_compute_global_address" "lb_ip" {
   name        = "${var.cluster_name}-lb-ip"
-  description = "OLD: Static IP for GCE Load Balancer — no longer used. Replaced by nginx_lb_ip"
+  description = "OLD: GCE Load Balancer IP — no longer used"
   project     = var.project_id
 }
 
 # ───────────────────────────────────────────────────────────────
-# NEW NGINX REGIONAL IP
-# REASON: NGINX Ingress Controller creates a Regional LB
-#         Regional LB cannot use Global IP
-#         This regional IP is what all DNS records point to
-#         IP: 35.225.189.52
+# NGINX REGIONAL IP — DATA SOURCE (READ ONLY)
+#
+# WHY DATA SOURCE NOT RESOURCE:
+#   This IP was created automatically by GKE
+#   when NGINX Ingress Controller service
+#   of type LoadBalancer was applied
+#   Terraform did NOT create it
+#   Terraform should NOT manage it
+#   Terraform should only READ it
+#
+# DATA SOURCE = read existing GCP resource
+# RESOURCE    = create new GCP resource
+#
+# Using data source prevents:
+#   Terraform creating duplicate IP
+#   DNS pointing to wrong new IP
+#   Service disruption
 # ───────────────────────────────────────────────────────────────
-resource "google_compute_address" "nginx_lb_ip" {
-  name         = "${var.cluster_name}-nginx-lb-ip"
-  description  = "Regional static IP for NGINX Ingress Load Balancer — all DNS records point here"
-  project      = var.project_id
-  region       = var.region
-  address_type = "EXTERNAL"
+data "google_compute_address" "nginx_lb_ip" {
+  name    = "nginx-lb-ip"
+  region  = var.region
+  project = var.project_id
 }
 
 # ───────────────────────────────────────────────────────────────
@@ -54,8 +65,10 @@ resource "google_dns_managed_zone" "chat_zone" {
 
 # ───────────────────────────────────────────────────────────────
 # DNS A RECORDS
-# CHANGED: All 4 records now point to nginx_lb_ip
-#          instead of old lb_ip (GCE Global IP)
+# All 4 records point to nginx_lb_ip DATA SOURCE
+# data.google_compute_address.nginx_lb_ip.address
+# = reads existing IP 35.225.189.52 from GCP
+# Does NOT create new IP
 # ───────────────────────────────────────────────────────────────
 
 # chatms.store → 35.225.189.52
@@ -65,8 +78,7 @@ resource "google_dns_record_set" "chat_a_record" {
   ttl          = 300
   managed_zone = google_dns_managed_zone.chat_zone.name
   project      = var.project_id
-  # CHANGED: lb_ip → nginx_lb_ip
-  rrdatas      = [google_compute_address.nginx_lb_ip.address]
+  rrdatas      = [data.google_compute_address.nginx_lb_ip.address]
 }
 
 # www.chatms.store → 35.225.189.52
@@ -76,8 +88,7 @@ resource "google_dns_record_set" "chat_www_record" {
   ttl          = 300
   managed_zone = google_dns_managed_zone.chat_zone.name
   project      = var.project_id
-  # CHANGED: lb_ip → nginx_lb_ip
-  rrdatas      = [google_compute_address.nginx_lb_ip.address]
+  rrdatas      = [data.google_compute_address.nginx_lb_ip.address]
 }
 
 # argocd.chatms.store → 35.225.189.52
@@ -87,8 +98,7 @@ resource "google_dns_record_set" "argocd_a_record" {
   ttl          = 300
   managed_zone = google_dns_managed_zone.chat_zone.name
   project      = var.project_id
-  # CHANGED: lb_ip → nginx_lb_ip
-  rrdatas      = [google_compute_address.nginx_lb_ip.address]
+  rrdatas      = [data.google_compute_address.nginx_lb_ip.address]
 }
 
 # grafana.chatms.store → 35.225.189.52
@@ -98,6 +108,5 @@ resource "google_dns_record_set" "grafana_a_record" {
   ttl          = 300
   managed_zone = google_dns_managed_zone.chat_zone.name
   project      = var.project_id
-  # CHANGED: lb_ip → nginx_lb_ip
-  rrdatas      = [google_compute_address.nginx_lb_ip.address]
+  rrdatas      = [data.google_compute_address.nginx_lb_ip.address]
 }

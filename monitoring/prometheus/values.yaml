@@ -1,45 +1,70 @@
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════
 # PROMETHEUS HELM VALUES
 # Scrapes metrics from all pods
-# Includes annotation-based discovery
-# ═══════════════════════════════════════════════
+# ═══════════════════════════════════════
 
 server:
   persistentVolume:
     size: 10Gi
 
-  retention: "15d"
+  retention: "7d"
+
+  # ADDED: Extra time for WAL replay
+  # WHY: Prometheus has 378 WAL segments
+  #      Takes up to 15 minutes to load
+  #      Default probe kills pod too early
+  livenessProbe:
+    httpGet:
+      path: /-/healthy
+      port: 9090
+    initialDelaySeconds: 300
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /-/ready
+      port: 9090
+    initialDelaySeconds: 300
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  # ADDED: Startup probe
+  # WHY: Allows up to 15 minutes
+  #      for initial WAL replay
+  #      Before liveness takes over
+  startupProbe:
+    httpGet:
+      path: /-/healthy
+      port: 9090
+    failureThreshold: 60
+    periodSeconds: 15
+    timeoutSeconds: 10
 
   resources:
     requests:
-      memory: 256Mi
-      cpu: 100m
-    limits:
       memory: 512Mi
       cpu: 200m
+    limits:
+      memory: 1Gi
+      cpu: 500m
 
-  # Extra scrape configs for
-  # annotation-based pod discovery
   extraScrapeConfigs: |
     - job_name: 'kubernetes-pods'
       kubernetes_sd_configs:
         - role: pod
       relabel_configs:
-        # Only scrape pods with annotation
-        # prometheus.io/scrape: "true"
         - source_labels:
             [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
           action: keep
           regex: true
-        # Use custom path if specified
-        # prometheus.io/path: "/metrics"
         - source_labels:
             [__meta_kubernetes_pod_annotation_prometheus_io_path]
           action: replace
           target_label: __metrics_path__
           regex: (.+)
-        # Use custom port if specified
-        # prometheus.io/port: "8080"
         - source_labels:
             [__address__,
              __meta_kubernetes_pod_annotation_prometheus_io_port]
@@ -47,17 +72,14 @@ server:
           regex: ([^:]+)(?::\d+)?;(\d+)
           replacement: $1:$2
           target_label: __address__
-        # Add namespace label
         - source_labels:
             [__meta_kubernetes_namespace]
           action: replace
           target_label: kubernetes_namespace
-        # Add pod name label
         - source_labels:
             [__meta_kubernetes_pod_name]
           action: replace
           target_label: kubernetes_pod_name
-        # Add app label
         - source_labels:
             [__meta_kubernetes_pod_label_app]
           action: replace
