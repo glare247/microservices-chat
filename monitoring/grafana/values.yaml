@@ -40,25 +40,28 @@ dashboardProviders:
 
 dashboards:
   default:
-    # KEPT: Node exporter full
-    # Shows CPU memory disk network
-    # per node - FULLY WORKING
+    # CHANGED: gnetId 1860 → 11074
+    # WHY: gnetId 1860 Node Exporter Full
+    #      requires job=node-exporter
+    #      Our Prometheus uses
+    #      job=kubernetes-service-endpoints
+    #      Dashboard showed N/A for all gauges
+    #
+    #      gnetId 11074 works with
+    #      any job name automatically
+    #      No UI variable configuration needed
     node-exporter:
-      gnetId: 1860
-      revision: 37
+      gnetId: 11074
+      revision: 9
       datasource: Prometheus
 
-    # KEPT: NGINX Ingress dashboard
-    # Shows request volume connections
-    # error rates - FULLY WORKING
+    # UNCHANGED: NGINX Ingress controller
     nginx-ingress:
       gnetId: 9614
       revision: 1
       datasource: Prometheus
 
-    # ADDED: Kubernetes cluster monitoring
-    # Shows cluster memory CPU network
-    # WORKING: memory 45.2% CPU 1.03%
+    # UNCHANGED: Kubernetes cluster monitoring
     cluster-monitoring:
       gnetId: 3119
       revision: 2
