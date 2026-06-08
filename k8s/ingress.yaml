@@ -10,6 +10,14 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    # ADDED: Sticky sessions for Socket.IO
+    # Routes all requests from same browser
+    # to the same chat-svc pod
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "chat-svc-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-change-on-failure: "true"
 spec:
   ingressClassName: nginx
   tls:
