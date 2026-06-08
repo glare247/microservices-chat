@@ -4,11 +4,12 @@ metadata:
   name: chat-ingress
   namespace: chat-app
   annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
 spec:
   ingressClassName: nginx
   tls:
@@ -20,6 +21,13 @@ spec:
     - host: chatms.store
       http:
         paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-svc
+                port:
+                  number: 80
           - path: /
             pathType: Prefix
             backend:
@@ -30,6 +38,13 @@ spec:
     - host: www.chatms.store
       http:
         paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-svc
+                port:
+                  number: 80
           - path: /
             pathType: Prefix
             backend:
