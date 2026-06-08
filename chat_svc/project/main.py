@@ -17,34 +17,39 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "default-secret-key")
 SERVICE_HOST = os.environ.get("CHAT_DB_HOST", "http://chat-db:80")
 
-# Initialize Prometheus metrics
 metrics = PrometheusMetrics(app)
 metrics.info('chat_svc_info', 'Chat Service Info', version='1.0.0')
 
 socketio = SocketIO()
 users_connected = []
 
+
 def get_messages():
     response = requests.get(SERVICE_HOST, timeout=10)
     return response.json()
+
 
 def post_message(data):
     response = requests.post(SERVICE_HOST, json=data, timeout=10)
     return response.json()
 
+
 @app.route("/")
 def index():
     return jsonify({})
 
+
 @app.route("/health")
 def health():
     return jsonify({"status": "healthy"}), 200
+
 
 @socketio.on('connect', namespace='/chat')
 def on_connect():
     current_app.logger.info("USER CONNECTED")
     for msg in get_messages():
         emit('msgs', msg)
+
 
 @socketio.on('log-in', namespace='/chat')
 def login(data):
@@ -64,6 +69,7 @@ def login(data):
         welcome="Hola {}".format(data["username"])
     ))
 
+
 @socketio.on('disconnect', namespace='/chat')
 def on_disconnect():
     user_id = session.get("user_id", "")
@@ -71,6 +77,7 @@ def on_disconnect():
         if user["id"] == user_id:
             users_connected.remove(user)
     emit('users_connected', len(users_connected), broadcast=True)
+
 
 @socketio.on('send_msg', namespace='/chat')
 def send_msg(data):
@@ -88,14 +95,8 @@ def send_msg(data):
     result_msg = post_message(msg)
     emit('msgs', result_msg, broadcast=True)
 
+
 def create_app():
-    # CHANGED: Added async_mode='eventlet'
-    # WHY: Matches gunicorn eventlet worker
-    #      Without this Socket.IO uses
-    #      wrong async mode and fails
-    # CHANGED: Added manage_session=False
-    # WHY: Let Flask manage sessions
-    #      not SocketIO
     socketio.init_app(
         app,
         async_mode='eventlet',
@@ -107,6 +108,7 @@ def create_app():
         ping_interval=25
     )
     return app
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=False)  # nosec B104
