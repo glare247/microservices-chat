@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: chat-svc
-          image: us-central1-docker.pkg.dev/microservices-chat-496017/chat-platform-cluster-registry/chat-svc:8789c6db0f9234190118321173a5d36a726c1b44
+          image: us-central1-docker.pkg.dev/microservices-chat-496017/chat-platform-cluster-registry/chat-svc:e051cdd618e8769965a1b1fa1e40d4711c5ce20c
           ports:
             - containerPort: 8080
           env:
