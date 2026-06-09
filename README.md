@@ -14,6 +14,76 @@ A fully production-grade cloud-native chat application deployed on Google Kubern
 
 ---
 
+## 📸 Project Screenshots
+
+### 1. Chat Application — Live at chatms.store
+
+> Username prompt on connect
+
+![Chat App Login](screenshots/chat-login.png)
+
+> Real-time messages working
+
+![Chat App Messages](screenshots/chat-messages.png)
+
+---
+
+### 2. ArgoCD — GitOps Dashboard
+
+> Application Healthy and Synced to GitHub master branch
+
+![ArgoCD Overview](screenshots/argocd-overview.png)
+
+> Full application resource tree — 48 healthy resources, 13 synced
+
+![ArgoCD Tree](screenshots/argocd-tree.png)
+
+---
+
+### 3. Grafana — Observability Dashboards
+
+> Node Exporter Full — CPU 19.4%, RAM 51.7%, Disk 73.8%, Uptime 2.1 days
+
+![Grafana Node Exporter](screenshots/grafana-node-exporter.png)
+
+> Kubernetes Cluster Monitoring — Memory 43.6%, CPU 3.43%, Network I/O live
+
+![Grafana Kubernetes](screenshots/grafana-kubernetes.png)
+
+> NGINX Ingress Controller — 0.0717 ops/s, 15.6 connections, 89.8% success rate
+
+![Grafana NGINX](screenshots/grafana-nginx.png)
+
+---
+
+### 4. GitHub Actions — CI/CD Pipeline
+
+> Latest pipeline run — All 3 stages passing in 4m 26s
+
+![GitHub Actions Pipeline](screenshots/github-actions-pipeline.png)
+
+> Full pipeline history — App pipelines green, Security nightly scans visible
+
+![GitHub Actions History](screenshots/github-actions-history.png)
+
+---
+
+### 5. Google Cloud Platform
+
+> GKE Cluster — chat-platform-cluster, us-central1, 4 nodes, 8 vCPUs, 16GB RAM, 100% healthy
+
+![GKE Cluster](screenshots/gke-cluster.png)
+
+> VPC Network — chat-platform-cluster-vpc with 3 subnets, 9 firewall rules
+
+![VPC Network](screenshots/vpc-network.png)
+
+> GKE Node VMs — 4 private nodes across us-central1-a and us-central1-b (no public IPs)
+
+![GKE Nodes](screenshots/gke-nodes.png)
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```
@@ -77,7 +147,7 @@ PRIVATE SUBNET 10.0.2.0/24 → GKE nodes, Cloud SQL (no public IPs)
 | Infrastructure as Code | Terraform | >= 1.3 |
 | Containerization | Docker | - |
 | CI Pipeline | GitHub Actions | - |
-| CD / GitOps | ArgoCD | Latest |
+| CD / GitOps | ArgoCD | v3.4.2 |
 | Ingress | NGINX Ingress Controller | Latest |
 | SSL | cert-manager + Let's Encrypt | Latest |
 | Metrics | Prometheus | v3.11.3 |
@@ -233,8 +303,6 @@ nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
 
 ### DNS Records
 
-All subdomains point to NGINX Regional Load Balancer IP:
-
 | Record | IP |
 |--------|-----|
 | chatms.store | 35.225.189.52 |
@@ -287,13 +355,11 @@ All Pods → Prometheus (scrapes /metrics) → Grafana
 
 | Dashboard | gnetId | Shows |
 |-----------|--------|-------|
-| Node Exporter Full | 11074 | CPU 15.9%, RAM 49.6%, Disk 73.7% |
-| Kubernetes Cluster Monitoring | 3119 | Cluster CPU, Memory, Network |
-| NGINX Ingress Controller | 9614 | Request volume, connections |
+| Node Exporter Full | 11074 | CPU 19.4%, RAM 51.7%, Disk 73.8% |
+| Kubernetes Cluster Monitoring | 3119 | Memory 43.6%, CPU 3.43% |
+| NGINX Ingress Controller | 9614 | 0.0717 ops/s, 15.6 connections |
 
 All 6 chat-app pods confirmed scraped by Prometheus (up=1 ✅)
-
-**Grafana**: https://grafana.chatms.store
 
 ---
 
@@ -328,8 +394,6 @@ All 6 chat-app pods confirmed scraped by Prometheus (up=1 ✅)
 
 ### Socket.IO Architecture Change
 
-The original framework design had the browser connecting to `chat-front` which then proxied to `chat-svc`. In our Kubernetes deployment this was changed:
-
 **Original design (single server):**
 ```
 Browser → chat-front → chat-svc (internal proxy)
@@ -341,7 +405,7 @@ Browser → NGINX → chat-front    (page load only)
 Browser → NGINX → chat-svc      (all Socket.IO traffic)
 ```
 
-**Why changed:** In Kubernetes each service has its own internal DNS name (e.g. `chat-svc`). Browsers cannot resolve internal Kubernetes DNS from outside the cluster. NGINX Ingress routes `/socket.io` directly to `chat-svc` using the public domain name.
+**Why changed:** In Kubernetes each service has its own internal DNS. Browsers cannot resolve internal Kubernetes DNS from outside the cluster. NGINX routes `/socket.io` directly to `chat-svc` using the public domain name.
 
 ### Socket.IO Version Compatibility
 
@@ -350,13 +414,10 @@ Browser → NGINX → chat-svc      (all Socket.IO traffic)
 | socket.io.min.js (browser client) | v4.7.5 | EIO=4 |
 | Flask-SocketIO (server) | 5.3.6 | EIO=4 |
 
-Both client and server must use EIO=4. Using mismatched versions causes 400 Bad Request errors on all Socket.IO connections.
-
 ### Eventlet Monkey Patching
 
 ```python
-# chat_svc/manage.py
-# MUST be first before any other imports
+# chat_svc/manage.py — MUST be first before any imports
 import eventlet
 eventlet.monkey_patch()
 
@@ -364,14 +425,10 @@ from project.main import create_app, socketio
 app = create_app()
 ```
 
-Required for correct async DNS resolution when using Gunicorn with eventlet worker class in GKE.
-
 ### on_connect Handler Signature
 
-Flask-SocketIO v5.x passes an `auth` parameter to the connect handler:
-
 ```python
-# Correct for Flask-SocketIO 5.x
+# Flask-SocketIO 5.x requires auth parameter
 @socketio.on('connect', namespace='/chat')
 def on_connect(auth):
     pass
@@ -419,16 +476,13 @@ helm repo update
 ### Step 3 — Install Core Components
 
 ```bash
-# NGINX Ingress Controller
 helm install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace
 
-# cert-manager
 helm install cert-manager jetstack/cert-manager \
   --namespace cert-manager --create-namespace \
   --set crds.enabled=true
 
-# ArgoCD
 helm install argocd argo/argo-cd \
   --namespace argocd --create-namespace
 ```
@@ -438,7 +492,7 @@ helm install argocd argo/argo-cd \
 ```bash
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/argocd-app.yaml
-# ArgoCD will automatically apply all remaining manifests
+# ArgoCD deploys everything else automatically
 ```
 
 ### Step 5 — Install Monitoring Stack
@@ -463,16 +517,6 @@ helm install grafana grafana/grafana \
   --values monitoring/grafana/values.yaml
 ```
 
-### Step 6 — Verify Deployment
-
-```bash
-kubectl get pods --namespace chat-app
-kubectl get pods --namespace argocd
-kubectl get pods --namespace monitoring
-kubectl get certificate --all-namespaces
-kubectl get ingress --all-namespaces
-```
-
 ---
 
 ## 🔧 Operations Guide
@@ -488,24 +532,13 @@ kubectl get secret argocd-initial-admin-secret \
 ### View Application Logs
 
 ```bash
-kubectl logs -l app=chat-front --namespace chat-app --follow
 kubectl logs -l app=chat-svc --namespace chat-app --follow
-kubectl logs -l app=chat-db --namespace chat-app --follow
 ```
 
-### Check Prometheus Targets
+### Check All Pods
 
 ```bash
-kubectl port-forward service/prometheus-server \
-  --namespace monitoring 9090:80
-# Open http://localhost:9090/targets
-```
-
-### Scale Application
-
-```bash
-kubectl scale deployment chat-front \
-  --namespace chat-app --replicas=3
+kubectl get pods --all-namespaces
 ```
 
 ---
@@ -516,12 +549,14 @@ kubectl scale deployment chat-front \
 |----------|------|---------|
 | GKE Cluster | chat-platform-cluster | Regional, us-central1, 4 nodes |
 | Node Type | e2-medium | 2 vCPU, 4GB RAM per node |
+| Total Compute | - | 8 vCPUs, 16 GB RAM |
 | Cloud SQL | chat-postgres-db | PostgreSQL 15, Regional HA |
 | SQL Private IP | 10.95.0.2 | No public IP |
 | Load Balancer | nginx-lb-ip | Regional, 35.225.189.52 |
 | Artifact Registry | chat-platform-cluster-registry | us-central1 |
 | DNS Zone | chatms.store | Google Cloud DNS |
 | State Bucket | kabiru-devops-tfstate-001 | Terraform remote state |
+| VPC Network | chat-platform-cluster-vpc | 3 subnets, 9 firewall rules |
 | GCP Region | us-central1 | Iowa, USA |
 | GCP Project | microservices-chat-496017 | - |
 
