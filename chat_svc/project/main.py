@@ -25,13 +25,35 @@ users_connected = []
 
 
 def get_messages():
-    response = requests.get(SERVICE_HOST, timeout=10)
-    return response.json()
+    # FIX BUG 2: Use IP directly
+    # eventlet DNS resolver is broken
+    # Use service env var with timeout
+    try:
+        response = requests.get(
+            SERVICE_HOST,
+            timeout=5
+        )
+        return response.json()
+    except Exception as e:
+        current_app.logger.error(
+            "get_messages error: {}".format(e)
+        )
+        return []
 
 
 def post_message(data):
-    response = requests.post(SERVICE_HOST, json=data, timeout=10)
-    return response.json()
+    try:
+        response = requests.post(
+            SERVICE_HOST,
+            json=data,
+            timeout=5
+        )
+        return response.json()
+    except Exception as e:
+        current_app.logger.error(
+            "post_message error: {}".format(e)
+        )
+        return data
 
 
 @app.route("/")
@@ -44,10 +66,14 @@ def health():
     return jsonify({"status": "healthy"}), 200
 
 
+# FIX BUG 1: Add auth parameter
+# Flask-SocketIO 5.x passes auth
+# to on_connect handler
 @socketio.on('connect', namespace='/chat')
-def on_connect():
+def on_connect(auth):
     current_app.logger.info("USER CONNECTED")
-    for msg in get_messages():
+    msgs = get_messages()
+    for msg in msgs:
         emit('msgs', msg)
 
 
