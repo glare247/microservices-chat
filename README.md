@@ -20,11 +20,13 @@ A fully production-grade cloud-native chat application deployed on Google Kubern
 
 > Username prompt on connect
 
-![Chat App Login](screenshots/chat-login.png)
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 46 29 AM" src="https://github.com/user-attachments/assets/93c5adb5-c61a-4714-8d27-ef7f13133bd6" />
+
 
 > Real-time messages working
 
-![Chat App Messages](screenshots/chat-messages.png)
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 47 30 AM" src="https://github.com/user-attachments/assets/29adc38f-6488-49ef-9d2f-b417b57f76f5" />
+
 
 ---
 
@@ -32,55 +34,69 @@ A fully production-grade cloud-native chat application deployed on Google Kubern
 
 > Application Healthy and Synced to GitHub master branch
 
-![ArgoCD Overview](screenshots/argocd-overview.png)
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 50 43 AM" src="https://github.com/user-attachments/assets/fea102b6-499b-490d-8eaf-c73cad9f6fc2" />
+
 
 > Full application resource tree — 48 healthy resources, 13 synced
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 52 07 AM" src="https://github.com/user-attachments/assets/8cfd1433-eb4a-430d-b3a2-40c92a358683" />
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 53 35 AM" src="https://github.com/user-attachments/assets/325abb79-661c-4449-a710-d11f482b47c6" />
 
-![ArgoCD Tree](screenshots/argocd-tree.png)
+
 
 ---
 
 ### 3. Grafana — Observability Dashboards
 
 > Node Exporter Full — CPU 19.4%, RAM 51.7%, Disk 73.8%, Uptime 2.1 days
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 54 35 AM" src="https://github.com/user-attachments/assets/c039fa37-1484-4cc4-86fa-f9cfa927115f" />
 
-![Grafana Node Exporter](screenshots/grafana-node-exporter.png)
+
 
 > Kubernetes Cluster Monitoring — Memory 43.6%, CPU 3.43%, Network I/O live
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 54 54 AM" src="https://github.com/user-attachments/assets/b6595ac1-98a9-44f9-acb5-b2c92597650b" />
 
-![Grafana Kubernetes](screenshots/grafana-kubernetes.png)
+
 
 > NGINX Ingress Controller — 0.0717 ops/s, 15.6 connections, 89.8% success rate
 
-![Grafana NGINX](screenshots/grafana-nginx.png)
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 55 08 AM" src="https://github.com/user-attachments/assets/356115b9-ec34-4cea-ab77-39ab952cabef" />
 
 ---
 
 ### 4. GitHub Actions — CI/CD Pipeline
 
 > Latest pipeline run — All 3 stages passing in 4m 26s
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 55 44 AM" src="https://github.com/user-attachments/assets/9399e7fd-5056-48df-bf4e-1c959970644c" />
 
-![GitHub Actions Pipeline](screenshots/github-actions-pipeline.png)
+
 
 > Full pipeline history — App pipelines green, Security nightly scans visible
 
-![GitHub Actions History](screenshots/github-actions-history.png)
+
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 11 56 28 AM" src="https://github.com/user-attachments/assets/754c32fe-93f4-497d-9437-08b4d6570b7e" />
 
 ---
 
 ### 5. Google Cloud Platform
 
 > GKE Cluster — chat-platform-cluster, us-central1, 4 nodes, 8 vCPUs, 16GB RAM, 100% healthy
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 12 14 49 PM" src="https://github.com/user-attachments/assets/0c499b91-4330-4bd3-b5e5-5f6e8db5378c" />
 
-![GKE Cluster](screenshots/gke-cluster.png)
 
 > VPC Network — chat-platform-cluster-vpc with 3 subnets, 9 firewall rules
+> <img width="1792" height="1120" alt="Screenshot 2026-06-09 at 12 12 41 PM" src="https://github.com/user-attachments/assets/c54e5160-02f8-4f49-ab1c-b0a8faf9efe9" />
 
-![VPC Network](screenshots/vpc-network.png)
+>
+> <img width="1792" height="1120" alt="Screenshot 2026-06-09 at 12 13 26 PM" src="https://github.com/user-attachments/assets/1abd3a5c-9a47-416e-b2d5-12cb09e63a09" />
+
+
+
 
 > GKE Node VMs — 4 private nodes across us-central1-a and us-central1-b (no public IPs)
 
-![GKE Nodes](screenshots/gke-nodes.png)
+
+
+<img width="1792" height="1120" alt="Screenshot 2026-06-09 at 12 16 11 PM" src="https://github.com/user-attachments/assets/dee17129-4b48-4cfa-8388-3adcbea4b83e" />
 
 ---
 
